@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Project } from "@/lib/types";
+import type { Phase, Project, Task, Thought } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
 import { AppHeader } from "@/components/app-header";
 import { InlineEdit } from "@/components/inline-edit";
 import { StatusPicker } from "@/components/status-picker";
 import { ArchiveButton } from "@/components/archive-button";
+import { PhasesPanel } from "@/components/phases-panel";
+import { ThoughtsPanel } from "@/components/thoughts-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +43,26 @@ export default async function ProjectPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data, error }, phasesRes, tasksRes, thoughtsRes] =
+    await Promise.all([
+      supabase.from("projects").select("*").eq("id", id).maybeSingle(),
+      supabase
+        .from("phases")
+        .select("*")
+        .eq("project_id", id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("tasks")
+        .select("*")
+        .eq("project_id", id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("thoughts")
+        .select("*")
+        .eq("project_id", id)
+        .order("created_at", { ascending: false })
+        .limit(100),
+    ]);
 
   if (error) {
     return (
@@ -107,6 +124,17 @@ export default async function ProjectPage({
             />
           ))}
         </section>
+
+        <PhasesPanel
+          projectId={project.id}
+          initialPhases={(phasesRes.data ?? []) as Phase[]}
+          initialTasks={(tasksRes.data ?? []) as Task[]}
+        />
+
+        <ThoughtsPanel
+          projectId={project.id}
+          initialThoughts={(thoughtsRes.data ?? []) as Thought[]}
+        />
 
         <div className="mt-10 border-t border-line pt-6">
           <ArchiveButton projectId={project.id} projectTitle={project.title} />
