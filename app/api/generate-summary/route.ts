@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { callAiJson } from "@/lib/ai/provider";
 import { HEURISTIC_SOURCE, summaryHeuristic } from "@/lib/ai/heuristic";
@@ -118,6 +118,7 @@ export async function POST(request: Request) {
   const row: Record<string, unknown> = {
     project_id: projectId,
     generated_at: new Date().toISOString(),
+    user_id: await getUserId(supabase),
   };
   for (const f of SUMMARY_FIELDS) {
     row[f] = fields[f].value;

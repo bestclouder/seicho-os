@@ -21,6 +21,8 @@ export type Project = {
   start_date: string | null;
   last_updated: string;
   created_at: string;
+  /** Present only after supabase/migrations/0003_add_tags.sql is applied. */
+  tags?: string[];
 };
 
 export type Phase = {

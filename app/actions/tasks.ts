@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import type { Task } from "@/lib/types";
 
@@ -34,6 +34,7 @@ export async function addTask(
       phase_id: phaseId,
       title: trimmed,
       sort_order: (maxRow?.sort_order ?? 0) + 1,
+      user_id: await getUserId(supabase),
     })
     .select("*")
     .single();

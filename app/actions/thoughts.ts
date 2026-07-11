@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import type { Thought } from "@/lib/types";
 
@@ -17,9 +17,10 @@ export async function addThought(
   if (!trimmed) return { ok: false, error: "Thought is empty." };
 
   const supabase = await createClient();
+  const userId = await getUserId(supabase);
   const { data, error } = await supabase
     .from("thoughts")
-    .insert({ project_id: projectId, body: trimmed })
+    .insert({ project_id: projectId, body: trimmed, user_id: userId })
     .select("*")
     .single();
 
@@ -37,6 +38,7 @@ export async function addThought(
     entity_id: data.id,
     action: "add_thought",
     payload: { project_id: projectId },
+    user_id: userId,
   });
 
   revalidatePath(`/projects/${projectId}`);

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import type { Idea } from "@/lib/types";
 
@@ -20,7 +20,11 @@ export async function addIdea(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ideas")
-    .insert({ title: trimmed, body: body.trim() || null })
+    .insert({
+      title: trimmed,
+      body: body.trim() || null,
+      user_id: await getUserId(supabase),
+    })
     .select("*")
     .single();
 

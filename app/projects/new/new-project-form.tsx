@@ -21,8 +21,10 @@ export type ProjectFormDefaults = {
 
 export function NewProjectForm({
   defaults,
+  tagsEnabled = false,
 }: {
   defaults?: ProjectFormDefaults;
+  tagsEnabled?: boolean;
 }) {
   const [titleError, setTitleError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -97,6 +99,16 @@ export function NewProjectForm({
           placeholder="How will you know it worked?"
         />
       </Field>
+
+      {tagsEnabled && (
+        <Field label="Tags (comma-separated)">
+          <input
+            name="tags"
+            className={inputCls}
+            placeholder="trading, learning, health"
+          />
+        </Field>
+      )}
 
       <Field label="Status">
         <select

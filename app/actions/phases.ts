@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import type { Phase } from "@/lib/types";
 
@@ -18,6 +18,7 @@ export async function addPhase(
   if (!trimmed) return { ok: false, error: "Phase needs a title." };
 
   const supabase = await createClient();
+  const userId = await getUserId(supabase);
   const { data: maxRow } = await supabase
     .from("phases")
     .select("sort_order")
@@ -32,6 +33,7 @@ export async function addPhase(
       project_id: projectId,
       title: trimmed,
       sort_order: (maxRow?.sort_order ?? 0) + 1,
+      user_id: userId,
     })
     .select("*")
     .single();
@@ -111,6 +113,7 @@ export async function applyPhaseDraft(
     return { ok: false, error: "Draft is empty." };
 
   const supabase = await createClient();
+  const userId = await getUserId(supabase);
   const { data: maxRow } = await supabase
     .from("phases")
     .select("sort_order")
@@ -129,7 +132,12 @@ export async function applyPhaseDraft(
     order += 1;
     const { data: phase, error } = await supabase
       .from("phases")
-      .insert({ project_id: projectId, title, sort_order: order })
+      .insert({
+        project_id: projectId,
+        title,
+        sort_order: order,
+        user_id: userId,
+      })
       .select("*")
       .single();
     if (error || !phase)
@@ -149,6 +157,7 @@ export async function applyPhaseDraft(
             phase_id: phase.id,
             title: t,
             sort_order: i + 1,
+            user_id: userId,
           })),
         )
         .select("*");

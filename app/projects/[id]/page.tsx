@@ -16,6 +16,7 @@ import { ArchiveButton } from "@/components/archive-button";
 import { PhasesPanel } from "@/components/phases-panel";
 import { ThoughtsPanel } from "@/components/thoughts-panel";
 import { ResumeCard } from "@/components/resume-card";
+import { TagEditor } from "@/components/tag-editor";
 import {
   RelationshipsPanel,
   type LinkedProject,
@@ -187,6 +188,9 @@ export default async function ProjectPage({
               placeholder={f.placeholder}
             />
           ))}
+          {Array.isArray(project.tags) && (
+            <TagEditor projectId={project.id} initialTags={project.tags} />
+          )}
         </section>
 
         <PhasesPanel

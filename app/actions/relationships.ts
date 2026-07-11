@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { RELATIONSHIP_TYPES, type ProjectRelationship } from "@/lib/types";
 
@@ -26,6 +26,7 @@ export async function addRelationship(
       source_project_id: sourceProjectId,
       target_project_id: targetProjectId,
       relationship_type: type,
+      user_id: await getUserId(supabase),
     })
     .select("*")
     .single();

@@ -1,5 +1,19 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+
+/** Signed-in user's id, or null in demo mode. Stamped on every insert so
+ *  owner-scoped RLS (0002_lockdown.sql) works the moment it's applied. */
+export async function getUserId(
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function createClient() {
   const cookieStore = await cookies();

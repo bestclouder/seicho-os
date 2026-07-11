@@ -12,12 +12,19 @@ export default async function NewProjectPage({
   searchParams: Promise<{ from_idea?: string }>;
 }) {
   const { from_idea } = await searchParams;
+  const supabase = await createClient();
+
+  // Tags input appears only once 0003_add_tags.sql has been applied
+  const { error: tagsProbe } = await supabase
+    .from("projects")
+    .select("tags")
+    .limit(1);
+  const tagsEnabled = !tagsProbe;
 
   let defaults: ProjectFormDefaults | undefined;
   let draftNote: string | null = null;
 
   if (from_idea) {
-    const supabase = await createClient();
     const { data: idea } = await supabase
       .from("ideas")
       .select("*")
@@ -49,7 +56,7 @@ export default async function NewProjectPage({
           {draftNote ??
             "Capture the understanding now — your future self resumes from it."}
         </p>
-        <NewProjectForm defaults={defaults} />
+        <NewProjectForm defaults={defaults} tagsEnabled={tagsEnabled} />
       </main>
     </>
   );

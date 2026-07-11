@@ -14,10 +14,11 @@ const FILTERS = ["All", "Active", "Exploring", "Paused", "Seed", "Completed"];
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; tag?: string }>;
 }) {
-  const { status } = await searchParams;
+  const { status, tag } = await searchParams;
   const filter = FILTERS.includes(status ?? "") ? status! : "All";
+  const tagFilter = (tag ?? "").trim().toLowerCase() || null;
   const supabase = await createClient();
 
   let projectsQuery = supabase
@@ -58,7 +59,17 @@ export default async function Dashboard({
     "project_id" | "created_at"
   >[];
 
-  const scored = projects
+  // Tags exist only once 0003_add_tags.sql is applied; select("*") makes
+  // detection free — the field is simply absent before then.
+  const tagsEnabled = projects.some((p) => Array.isArray(p.tags));
+  const allTags = tagsEnabled
+    ? [...new Set(projects.flatMap((p) => p.tags ?? []))].sort()
+    : [];
+  const visible = tagFilter
+    ? projects.filter((p) => (p.tags ?? []).includes(tagFilter))
+    : projects;
+
+  const scored = visible
     .map((project) => {
       const projectPhases = phases.filter((p) => p.project_id === project.id);
       const lastThought =
@@ -119,6 +130,30 @@ export default async function Dashboard({
           ))}
         </div>
 
+        {allTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {allTags.map((t) => (
+              <Link
+                key={t}
+                href={
+                  tagFilter === t
+                    ? filter === "All"
+                      ? "/"
+                      : `/?status=${filter}`
+                    : `/?${filter === "All" ? "" : `status=${filter}&`}tag=${encodeURIComponent(t)}`
+                }
+                className={`rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors ${
+                  tagFilter === t
+                    ? "border-indigo-ai bg-indigo-ai text-white"
+                    : "border-line bg-card text-faint hover:text-ink"
+                }`}
+              >
+                #{t}
+              </Link>
+            ))}
+          </div>
+        )}
+
         <div className="mb-4 mt-5 flex items-baseline justify-between">
           <h1 className="font-display text-sm font-medium text-faint">
             {scored.length} project{scored.length === 1 ? "" : "s"}, sorted by
@@ -168,6 +203,12 @@ export default async function Dashboard({
                       <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-faint/80">
                         updated {timeAgo(project.last_updated)} · momentum{" "}
                         {score}
+                        {(project.tags ?? []).length > 0 && (
+                          <span className="normal-case text-moss">
+                            {" "}
+                            · {(project.tags ?? []).map((t) => `#${t}`).join(" ")}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

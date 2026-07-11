@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { PROJECT_STATUSES, type ProjectStatus } from "@/lib/types";
 
@@ -24,21 +24,35 @@ export async function createProject(formData: FormData) {
 
   const status = String(formData.get("status") ?? "Seed");
   const supabase = await createClient();
+  const userId = await getUserId(supabase);
+
+  const row: Record<string, unknown> = {
+    title,
+    summary: String(formData.get("summary") ?? "").trim() || null,
+    vision: String(formData.get("vision") ?? "").trim() || null,
+    why_it_matters: String(formData.get("why_it_matters") ?? "").trim() || null,
+    success_criteria:
+      String(formData.get("success_criteria") ?? "").trim() || null,
+    status: PROJECT_STATUSES.includes(status as ProjectStatus)
+      ? status
+      : "Seed",
+    start_date: new Date().toISOString().slice(0, 10),
+    user_id: userId,
+  };
+  // tags column exists only after 0003_add_tags.sql; the field is only
+  // rendered when the probe says so, so only include it when submitted
+  const tagsRaw = String(formData.get("tags") ?? "").trim();
+  if (tagsRaw) {
+    row.tags = tagsRaw
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 10);
+  }
+
   const { data, error } = await supabase
     .from("projects")
-    .insert({
-      title,
-      summary: String(formData.get("summary") ?? "").trim() || null,
-      vision: String(formData.get("vision") ?? "").trim() || null,
-      why_it_matters:
-        String(formData.get("why_it_matters") ?? "").trim() || null,
-      success_criteria:
-        String(formData.get("success_criteria") ?? "").trim() || null,
-      status: PROJECT_STATUSES.includes(status as ProjectStatus)
-        ? status
-        : "Seed",
-      start_date: new Date().toISOString().slice(0, 10),
-    })
+    .insert(row)
     .select("id")
     .single();
 
@@ -50,6 +64,7 @@ export async function createProject(formData: FormData) {
     entity_id: data.id,
     action: "create_project",
     payload: { title, status },
+    user_id: userId,
   });
 
   // Reviewed idea promotion — link the idea to its new project
@@ -141,4 +156,34 @@ export async function archiveProject(projectId: string): Promise<ActionResult> {
     revalidatePath("/");
   }
   return result;
+}
+
+/** Available once supabase/migrations/0003_add_tags.sql is applied. */
+export async function updateProjectTags(
+  projectId: string,
+  tags: string[],
+): Promise<ActionResult> {
+  const clean = tags
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 10);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ tags: clean, last_updated: new Date().toISOString() })
+    .eq("id", projectId);
+  if (error) return { ok: false, error: error.message };
+
+  await writeAudit(supabase, {
+    entity_type: "project",
+    entity_id: projectId,
+    action: "update_project_tags",
+    payload: { tags: clean },
+    user_id: await getUserId(supabase),
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
+  return { ok: true };
 }
