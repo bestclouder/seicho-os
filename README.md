@@ -38,18 +38,22 @@ add **one** of these to Vercel env (server-side only):
 - `OPENAI_API_KEY` (+ optional `OPENAI_MODEL`, default `gpt-4o`)
 - `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`, default `claude-sonnet-5`)
 
-## Security status
+## Access model (lockdown APPLIED)
 
-- v1 ships with the planned permissive demo RLS (`0001_init.sql`) — no real user
-  data yet.
-- The Sprint 4 owner-scoped lockdown is written at
-  [`supabase/migrations/0002_lockdown.sql`](supabase/migrations/0002_lockdown.sql)
-  but **not yet applied** — applying needs DB admin access (Supabase dashboard
-  SQL editor or service-role key), which isn't in this project's env. Run it
-  before onboarding real users.
-- Client bundle verified clean: `grep -r OPENAI_API_KEY .next/static` → 0 hits.
-- Security headers (frame denial, nosniff, referrer policy) set in
-  [`next.config.ts`](next.config.ts).
+[`0002_lockdown.sql`](supabase/migrations/0002_lockdown.sql) and
+[`0003_add_tags.sql`](supabase/migrations/0003_add_tags.sql) are live on the
+database:
+
+- **Demo** — rows with `user_id NULL` (the original seed workspace) are
+  publicly readable and frozen; anyone can explore without an account.
+- **Sign up** (magic link, one link does sign-in and sign-up) — a `profiles`
+  row is auto-created: `bestclouder@gmail.com` gets the `lifetime` plan;
+  everyone else gets a `trial` — full access for 7 days, then their workspace
+  turns view-only (content stays readable, writes are refused).
+- Enforcement is owner-scoped RLS + a `can_write()` plan gate in Postgres; the
+  UI mirrors it (banners, hidden editors) but the database is the authority.
+- Audit logs are append-only. Client bundle verified clean of secrets.
+  Security headers set in [`next.config.ts`](next.config.ts).
 
 ## Stack
 
