@@ -11,6 +11,7 @@ export function InlineEdit({
   value,
   multiline = true,
   placeholder = "Tap to add",
+  readOnly = false,
 }: {
   projectId: string;
   field: string;
@@ -18,6 +19,7 @@ export function InlineEdit({
   value: string | null;
   multiline?: boolean;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
@@ -33,6 +35,25 @@ export function InlineEdit({
       }
       setEditing(false);
     });
+  }
+
+  if (readOnly) {
+    return (
+      <div>
+        {label && (
+          <span className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-faint">
+            {label}
+          </span>
+        )}
+        <p className="px-1 py-0.5 text-[15px] leading-relaxed">
+          {value ? (
+            <span className="whitespace-pre-wrap">{value}</span>
+          ) : (
+            <span className="text-faint/70 italic">—</span>
+          )}
+        </p>
+      </div>
+    );
   }
 
   return (

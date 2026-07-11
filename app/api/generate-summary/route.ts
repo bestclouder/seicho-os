@@ -134,10 +134,19 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) {
+    // Post-lockdown, read-only callers (demo viewers, expired trials) can't
+    // store a regenerated summary — serve the last stored one instead.
     console.error("project_summaries insert failed:", insertError.message);
+    if (existing) {
+      return NextResponse.json({
+        summary: existing,
+        regenerated: false,
+        error: "Read-only — showing stored summary",
+      });
+    }
     return NextResponse.json(
-      { error: "Could not store summary", summary: existing ?? null },
-      { status: 500 },
+      { error: "Sign in to generate summaries" },
+      { status: 403 },
     );
   }
 

@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import { draftProjectFromIdea } from "@/lib/ai/draft";
 import type { Idea } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
+import { AccessBanner } from "@/components/access-banner";
 import { NewProjectForm, type ProjectFormDefaults } from "./new-project-form";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +16,34 @@ export default async function NewProjectPage({
 }) {
   const { from_idea } = await searchParams;
   const supabase = await createClient();
+  const access = await getAccess(supabase);
+
+  if (!access.canWrite) {
+    return (
+      <>
+        <AppHeader />
+        <AccessBanner access={access} />
+        <main className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <p className="font-display text-lg">
+            {access.userId
+              ? "Your trial has ended — new projects are paused."
+              : "Sign up to create your own projects."}
+          </p>
+          <p className="mt-1 text-sm text-faint">
+            {access.userId
+              ? "Everything you built stays readable."
+              : "Free full access for 7 days, view-only after that."}
+          </p>
+          <Link
+            href={access.userId ? "/" : "/login"}
+            className="mt-5 inline-block rounded-lg bg-moss px-4 py-2.5 text-sm font-medium text-white"
+          >
+            {access.userId ? "Back to dashboard" : "Sign up"}
+          </Link>
+        </main>
+      </>
+    );
+  }
 
   // Tags input appears only once 0003_add_tags.sql has been applied
   const { error: tagsProbe } = await supabase

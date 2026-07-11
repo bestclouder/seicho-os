@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import { momentumScore } from "@/lib/momentum";
 import { timeAgo } from "@/lib/format";
 import type { Phase, Project, Thought } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
+import { AccessBanner } from "@/components/access-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { GrowthRing } from "@/components/growth-ring";
 
@@ -20,6 +22,7 @@ export default async function Dashboard({
   const filter = FILTERS.includes(status ?? "") ? status! : "All";
   const tagFilter = (tag ?? "").trim().toLowerCase() || null;
   const supabase = await createClient();
+  const access = await getAccess(supabase);
 
   let projectsQuery = supabase
     .from("projects")
@@ -89,14 +92,24 @@ export default async function Dashboard({
     <>
       <AppHeader
         action={
-          <Link
-            href="/projects/new"
-            className="rounded-lg bg-moss px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
-            New project
-          </Link>
+          access.canWrite ? (
+            <Link
+              href="/projects/new"
+              className="rounded-lg bg-moss px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            >
+              New project
+            </Link>
+          ) : !access.userId ? (
+            <Link
+              href="/login"
+              className="rounded-lg bg-moss px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            >
+              Sign up
+            </Link>
+          ) : undefined
         }
       />
+      <AccessBanner access={access} />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
         <div className="flex items-center gap-2">
           <form action="/search" className="min-w-0 flex-1">
@@ -172,10 +185,10 @@ export default async function Dashboard({
                 : "Try a different filter, or create a project."}
             </p>
             <Link
-              href="/projects/new"
+              href={access.canWrite ? "/projects/new" : "/login"}
               className="mt-5 inline-block rounded-lg bg-moss px-4 py-2.5 text-sm font-medium text-white"
             >
-              Create a project
+              {access.canWrite ? "Create a project" : "Sign up to create projects"}
             </Link>
           </div>
         ) : (

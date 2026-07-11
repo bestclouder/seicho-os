@@ -19,10 +19,12 @@ export function ResumeCard({
   projectId,
   initialSummary,
   hasThoughts,
+  readOnly = false,
 }: {
   projectId: string;
   initialSummary: ProjectSummary | null;
   hasThoughts: boolean;
+  readOnly?: boolean;
 }) {
   const [summary, setSummary] = useState<ProjectSummary | null>(initialSummary);
   const [loading, setLoading] = useState(false);
@@ -52,15 +54,16 @@ export function ResumeCard({
     [projectId],
   );
 
-  // On open: regenerate when missing or stale (>24h) — docs/ARCHITECTURE.md
+  // On open: regenerate when missing or stale (>24h) — docs/ARCHITECTURE.md.
+  // Read-only viewers (demo, expired trial) just see the stored summary.
   useEffect(() => {
-    if (requested.current) return;
+    if (requested.current || readOnly) return;
     requested.current = true;
     const stale =
       !initialSummary ||
       Date.now() - new Date(initialSummary.generated_at).getTime() > STALE_MS;
     if (stale) generate(false);
-  }, [initialSummary, generate]);
+  }, [initialSummary, generate, readOnly]);
 
   const empty = !summary && !hasThoughts;
 
@@ -72,13 +75,15 @@ export function ResumeCard({
           <span className="inline-block h-2 w-2 rounded-full bg-clay" />
           Resume here
         </h2>
-        <button
-          onClick={() => generate(true)}
-          disabled={loading}
-          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-moss underline-offset-4 hover:underline disabled:opacity-50"
-        >
-          {loading ? "Thinking…" : "Refresh understanding"}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => generate(true)}
+            disabled={loading}
+            className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-moss underline-offset-4 hover:underline disabled:opacity-50"
+          >
+            {loading ? "Thinking…" : "Refresh understanding"}
+          </button>
+        )}
       </div>
 
       {loading && !summary ? (
@@ -128,6 +133,10 @@ export function ResumeCard({
             {notice && <span className="text-clay"> · {notice}, showing last version</span>}
           </p>
         </>
+      ) : readOnly ? (
+        <p className="mt-3 text-sm text-faint">
+          No stored summary for this project yet.
+        </p>
       ) : (
         <p className="mt-3 text-sm text-clay">
           {notice ?? "Could not generate a summary."}{" "}

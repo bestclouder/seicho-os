@@ -23,10 +23,12 @@ export function PhasesPanel({
   projectId,
   initialPhases,
   initialTasks,
+  readOnly = false,
 }: {
   projectId: string;
   initialPhases: Phase[];
   initialTasks: Task[];
+  readOnly?: boolean;
 }) {
   const [phases, setPhases] = useState<Phase[]>(initialPhases);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -77,7 +79,9 @@ export function PhasesPanel({
 
       {phases.length === 0 && (
         <p className="mb-3 rounded-xl border border-dashed border-line bg-card px-4 py-6 text-center text-sm text-faint">
-          Add your first phase to give this project a shape.
+          {readOnly
+            ? "No phases."
+            : "Add your first phase to give this project a shape."}
         </p>
       )}
 
@@ -88,6 +92,7 @@ export function PhasesPanel({
             phase={phase}
             index={i}
             count={phases.length}
+            readOnly={readOnly}
             tasks={tasks.filter((t) => t.phase_id === phase.id)}
             projectId={projectId}
             onMove={move}
@@ -132,6 +137,7 @@ export function PhasesPanel({
               <TaskRow
                 key={task.id}
                 task={task}
+                readOnly={readOnly}
                 onStatus={(status) =>
                   setTasks((list) =>
                     list.map((t) => (t.id === task.id ? { ...t, status } : t)),
@@ -146,29 +152,31 @@ export function PhasesPanel({
         </div>
       )}
 
-      <div className="mt-3 flex gap-2">
-        <input
-          value={newPhaseTitle}
-          onChange={(e) => setNewPhaseTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAddPhase()}
-          placeholder="New phase title…"
-          className="min-h-11 flex-1 rounded-xl border border-line bg-card px-3.5 py-2 text-[15px] outline-none focus:border-moss"
-        />
-        <button
-          onClick={handleAddPhase}
-          disabled={!newPhaseTitle.trim()}
-          className="min-h-11 rounded-xl border border-moss/30 px-4 text-sm font-medium text-moss transition-colors hover:bg-moss-soft disabled:opacity-40"
-        >
-          Add phase
-        </button>
-        <SuggestPhases
-          projectId={projectId}
-          onApplied={(newPhases, newTasks) => {
-            setPhases((list) => [...list, ...newPhases]);
-            setTasks((list) => [...list, ...newTasks]);
-          }}
-        />
-      </div>
+      {!readOnly && (
+        <div className="mt-3 flex gap-2">
+          <input
+            value={newPhaseTitle}
+            onChange={(e) => setNewPhaseTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddPhase()}
+            placeholder="New phase title…"
+            className="min-h-11 flex-1 rounded-xl border border-line bg-card px-3.5 py-2 text-[15px] outline-none focus:border-moss"
+          />
+          <button
+            onClick={handleAddPhase}
+            disabled={!newPhaseTitle.trim()}
+            className="min-h-11 rounded-xl border border-moss/30 px-4 text-sm font-medium text-moss transition-colors hover:bg-moss-soft disabled:opacity-40"
+          >
+            Add phase
+          </button>
+          <SuggestPhases
+            projectId={projectId}
+            onApplied={(newPhases, newTasks) => {
+              setPhases((list) => [...list, ...newPhases]);
+              setTasks((list) => [...list, ...newTasks]);
+            }}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -179,6 +187,7 @@ function PhaseCard({
   count,
   tasks,
   projectId,
+  readOnly = false,
   onMove,
   onRename,
   onStatus,
@@ -192,6 +201,7 @@ function PhaseCard({
   count: number;
   tasks: Task[];
   projectId: string;
+  readOnly?: boolean;
   onMove: (phaseId: string, dir: -1 | 1) => void;
   onRename: (title: string) => void;
   onStatus: (status: Phase["status"]) => void;
@@ -247,7 +257,11 @@ function PhaseCard({
         <span className="font-display text-sm font-semibold text-faint">
           {index + 1}
         </span>
-        {editing ? (
+        {readOnly ? (
+          <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold">
+            {phase.title}
+          </span>
+        ) : editing ? (
           <input
             autoFocus
             value={title}
@@ -265,6 +279,11 @@ function PhaseCard({
             {phase.title}
           </button>
         )}
+        {readOnly ? (
+          <span className="rounded-md border border-line bg-paper px-1.5 py-1 font-mono text-[10px] uppercase tracking-wider text-faint">
+            {PHASE_STATUS_LABEL[phase.status]}
+          </span>
+        ) : (
         <select
           value={phase.status}
           aria-label="Phase status"
@@ -284,6 +303,8 @@ function PhaseCard({
             </option>
           ))}
         </select>
+        )}
+        {!readOnly && (
         <div className="flex shrink-0">
           <IconButton
             label="Move phase up"
@@ -314,6 +335,7 @@ function PhaseCard({
             ✕
           </IconButton>
         </div>
+        )}
       </div>
 
       {tasks.length > 0 && (
@@ -332,12 +354,14 @@ function PhaseCard({
           <TaskRow
             key={task.id}
             task={task}
+            readOnly={readOnly}
             onStatus={(status) => onTaskStatus(task.id, status)}
             onDelete={() => onTaskDelete(task.id)}
           />
         ))}
       </ul>
 
+      {!readOnly && (
       <div className="mt-2 flex gap-2">
         <input
           value={newTask}
@@ -354,24 +378,42 @@ function PhaseCard({
           Add
         </button>
       </div>
+      )}
     </li>
   );
 }
 
 function TaskRow({
   task,
+  readOnly = false,
   onStatus,
   onDelete,
 }: {
   task: Task;
+  readOnly?: boolean;
   onStatus: (status: Task["status"]) => void;
   onDelete: () => void;
 }) {
   const [, startTransition] = useTransition();
   const toast = useToast();
 
+  const marker = `flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] transition-colors ${
+    task.status === "done"
+      ? "border-moss bg-moss text-white"
+      : task.status === "doing"
+        ? "border-gold bg-gold-soft text-gold"
+        : "border-line bg-card text-transparent"
+  }`;
+  const glyph =
+    task.status === "done" ? "✓" : task.status === "doing" ? "›" : "·";
+
   return (
     <li className="group flex min-h-11 items-center gap-2.5 rounded-lg px-1 hover:bg-paper">
+      {readOnly ? (
+        <span aria-label={`Task status: ${task.status}`} className={marker}>
+          {glyph}
+        </span>
+      ) : (
       <button
         aria-label={`Task status: ${task.status}. Tap to advance.`}
         onClick={() =>
@@ -381,16 +423,11 @@ function TaskRow({
             else if (result.status) onStatus(result.status);
           })
         }
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] transition-colors ${
-          task.status === "done"
-            ? "border-moss bg-moss text-white"
-            : task.status === "doing"
-              ? "border-gold bg-gold-soft text-gold"
-              : "border-line bg-card text-transparent"
-        }`}
+        className={marker}
       >
-        {task.status === "done" ? "✓" : task.status === "doing" ? "›" : "·"}
+        {glyph}
       </button>
+      )}
       <span
         className={`min-w-0 flex-1 truncate text-[15px] ${
           task.status === "done" ? "text-faint line-through" : ""
@@ -403,19 +440,21 @@ function TaskRow({
           doing
         </span>
       )}
-      <button
-        aria-label="Delete task"
-        onClick={() =>
-          startTransition(async () => {
-            const result = await deleteTask(task.id);
-            if (!result.ok) toast(result.error, "error");
-            else onDelete();
-          })
-        }
-        className="px-1.5 py-1 text-faint/50 opacity-0 transition-opacity hover:text-clay group-hover:opacity-100"
-      >
-        ✕
-      </button>
+      {!readOnly && (
+        <button
+          aria-label="Delete task"
+          onClick={() =>
+            startTransition(async () => {
+              const result = await deleteTask(task.id);
+              if (!result.ok) toast(result.error, "error");
+              else onDelete();
+            })
+          }
+          className="px-1.5 py-1 text-faint/50 opacity-0 transition-opacity hover:text-clay group-hover:opacity-100"
+        >
+          ✕
+        </button>
+      )}
     </li>
   );
 }

@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import type { Idea } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
+import { AccessBanner } from "@/components/access-banner";
 import { IdeasList } from "./ideas-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function IdeasPage() {
   const supabase = await createClient();
+  const access = await getAccess(supabase);
   const { data, error } = await supabase
     .from("ideas")
     .select("*")
@@ -32,12 +35,16 @@ export default async function IdeasPage() {
   return (
     <>
       <AppHeader />
+      <AccessBanner access={access} />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
         <h1 className="font-display text-2xl font-semibold">Idea inbox</h1>
         <p className="mt-1 text-sm text-faint">
           Capture raw ideas now; promote the ones that earn a project.
         </p>
-        <IdeasList initialIdeas={(data ?? []) as Idea[]} />
+        <IdeasList
+          initialIdeas={(data ?? []) as Idea[]}
+          readOnly={!access.canWrite}
+        />
       </main>
     </>
   );

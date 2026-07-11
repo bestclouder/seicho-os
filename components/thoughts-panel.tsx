@@ -11,10 +11,12 @@ export function ThoughtsPanel({
   projectId,
   initialThoughts,
   initialHasMore = false,
+  readOnly = false,
 }: {
   projectId: string;
   initialThoughts: Thought[];
   initialHasMore?: boolean;
+  readOnly?: boolean;
 }) {
   const [thoughts, setThoughts] = useState<Thought[]>(initialThoughts);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -117,6 +119,7 @@ export function ThoughtsPanel({
       )}
 
       {/* Sticky capture bar — the five-second promise */}
+      {readOnly ? null : (
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-end gap-2 px-4 py-3">
           <textarea
@@ -142,6 +145,7 @@ export function ThoughtsPanel({
           </button>
         </div>
       </div>
+      )}
     </section>
   );
 }

@@ -7,7 +7,13 @@ import { useToast } from "@/components/toast";
 import { timeAgo } from "@/lib/format";
 import type { Idea } from "@/lib/types";
 
-export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
+export function IdeasList({
+  initialIdeas,
+  readOnly = false,
+}: {
+  initialIdeas: Idea[];
+  readOnly?: boolean;
+}) {
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -33,6 +39,7 @@ export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
 
   return (
     <>
+      {!readOnly && (
       <div className="mt-6 rounded-xl border border-line bg-card p-4">
         <input
           value={title}
@@ -55,6 +62,7 @@ export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
           {pending ? "Saving…" : "Capture idea"}
         </button>
       </div>
+      )}
 
       <section className="mt-8">
         <h2 className="mb-3 font-mono text-[11px] uppercase tracking-wider text-faint">
@@ -62,7 +70,9 @@ export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
         </h2>
         {inbox.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line bg-card px-4 py-8 text-center text-sm text-faint">
-            Inbox zero. Capture the next spark above.
+            {readOnly
+              ? "No ideas in the inbox."
+              : "Inbox zero. Capture the next spark above."}
           </p>
         ) : (
           <ul className="space-y-2.5">
@@ -85,6 +95,7 @@ export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
                       {timeAgo(idea.created_at)}
                     </p>
                   </div>
+                  {!readOnly && (
                   <div className="flex shrink-0 gap-1.5">
                     <Link
                       href={`/projects/new?from_idea=${idea.id}`}
@@ -114,6 +125,7 @@ export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
                       Dismiss
                     </button>
                   </div>
+                  )}
                 </div>
               </li>
             ))}
@@ -142,6 +154,10 @@ export function IdeasList({ initialIdeas }: { initialIdeas: Idea[] }) {
                   >
                     promoted →
                   </Link>
+                ) : readOnly ? (
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-faint/60">
+                    dismissed
+                  </span>
                 ) : (
                   <button
                     onClick={() =>

@@ -9,8 +9,11 @@ import type {
   Thought,
 } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
+import { getAccess } from "@/lib/access";
 import { AppHeader } from "@/components/app-header";
+import { AccessBanner } from "@/components/access-banner";
 import { InlineEdit } from "@/components/inline-edit";
+import { StatusBadge } from "@/components/status-badge";
 import { StatusPicker } from "@/components/status-picker";
 import { ArchiveButton } from "@/components/archive-button";
 import { PhasesPanel } from "@/components/phases-panel";
@@ -55,6 +58,7 @@ export default async function ProjectPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const access = await getAccess(supabase);
 
   const [
     { data, error },
@@ -118,6 +122,11 @@ export default async function ProjectPage({
   if (!data) notFound();
 
   const project = data as Project;
+  // Demo rows (user_id null) are read-only for everyone once locked down;
+  // owned rows are writable only with an active plan. RLS enforces this
+  // server-side — the flag just keeps the UI honest.
+  const readOnly =
+    access.lockdownApplied && (!access.canWrite || project.user_id === null);
   const allThoughts = (thoughtsRes.data ?? []) as Thought[];
   const thoughts = allThoughts.slice(0, 50);
   const hasMoreThoughts = allThoughts.length > 50;
@@ -144,12 +153,22 @@ export default async function ProjectPage({
   return (
     <>
       <AppHeader
-        action={<StatusPicker projectId={project.id} status={project.status} />}
+        action={
+          readOnly ? (
+            <StatusBadge status={project.status} />
+          ) : (
+            <StatusPicker projectId={project.id} status={project.status} />
+          )
+        }
       />
+      <AccessBanner access={access} />
       <main className="mx-auto max-w-2xl px-4 pb-40 pt-6">
         <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
           updated {timeAgo(project.last_updated)}
           {project.start_date && ` · started ${project.start_date}`}
+          {readOnly && access.lockdownApplied && project.user_id === null && (
+            <span className="text-indigo-ai"> · demo project</span>
+          )}
         </p>
         <div className="mt-1">
           <InlineEdit
@@ -158,6 +177,7 @@ export default async function ProjectPage({
             label=""
             value={project.title}
             multiline={false}
+            readOnly={readOnly}
           />
         </div>
         <div className="mt-2">
@@ -168,6 +188,7 @@ export default async function ProjectPage({
             value={project.summary}
             multiline={false}
             placeholder="One sentence: what is this?"
+            readOnly={readOnly}
           />
         </div>
 
@@ -175,6 +196,7 @@ export default async function ProjectPage({
           projectId={project.id}
           initialSummary={(summaryRes.data ?? null) as ProjectSummary | null}
           hasThoughts={thoughts.length > 0}
+          readOnly={readOnly}
         />
 
         <section className="mt-8 space-y-6 rounded-xl border border-line bg-card p-5">
@@ -186,10 +208,15 @@ export default async function ProjectPage({
               label={f.label}
               value={project[f.field as keyof Project] as string | null}
               placeholder={f.placeholder}
+              readOnly={readOnly}
             />
           ))}
           {Array.isArray(project.tags) && (
-            <TagEditor projectId={project.id} initialTags={project.tags} />
+            <TagEditor
+              projectId={project.id}
+              initialTags={project.tags}
+              readOnly={readOnly}
+            />
           )}
         </section>
 
@@ -197,23 +224,28 @@ export default async function ProjectPage({
           projectId={project.id}
           initialPhases={(phasesRes.data ?? []) as Phase[]}
           initialTasks={(tasksRes.data ?? []) as Task[]}
+          readOnly={readOnly}
         />
 
         <RelationshipsPanel
           projectId={project.id}
           initialLinks={links}
           otherProjects={otherProjects}
+          readOnly={readOnly}
         />
 
         <ThoughtsPanel
           projectId={project.id}
           initialThoughts={thoughts}
           initialHasMore={hasMoreThoughts}
+          readOnly={readOnly}
         />
 
-        <div className="mt-10 border-t border-line pt-6">
-          <ArchiveButton projectId={project.id} projectTitle={project.title} />
-        </div>
+        {!readOnly && (
+          <div className="mt-10 border-t border-line pt-6">
+            <ArchiveButton projectId={project.id} projectTitle={project.title} />
+          </div>
+        )}
       </main>
     </>
   );

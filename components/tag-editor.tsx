@@ -8,9 +8,11 @@ import { useToast } from "@/components/toast";
 export function TagEditor({
   projectId,
   initialTags,
+  readOnly = false,
 }: {
   projectId: string;
   initialTags: string[];
+  readOnly?: boolean;
 }) {
   const [tags, setTags] = useState<string[]>(initialTags);
   const [draft, setDraft] = useState("");
@@ -34,6 +36,27 @@ export function TagEditor({
     setDraft("");
     if (!t || tags.includes(t)) return;
     save([...tags, t]);
+  }
+
+  if (readOnly) {
+    if (tags.length === 0) return null;
+    return (
+      <div>
+        <span className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-faint">
+          Tags
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {tags.map((t) => (
+            <span
+              key={t}
+              className="inline-flex rounded-full bg-moss-soft px-2.5 py-1 font-mono text-[11px] text-moss"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -31,10 +31,12 @@ export function RelationshipsPanel({
   projectId,
   initialLinks,
   otherProjects,
+  readOnly = false,
 }: {
   projectId: string;
   initialLinks: LinkedProject[];
   otherProjects: { id: string; title: string }[];
+  readOnly?: boolean;
 }) {
   const [links, setLinks] = useState<LinkedProject[]>(initialLinks);
   const [targetId, setTargetId] = useState("");
@@ -76,7 +78,9 @@ export function RelationshipsPanel({
 
       {links.length === 0 ? (
         <p className="mb-3 text-sm text-faint">
-          No links yet — connect this to the projects it feeds or depends on.
+          {readOnly
+            ? "No linked projects."
+            : "No links yet — connect this to the projects it feeds or depends on."}
         </p>
       ) : (
         <ul className="mb-3 space-y-2">
@@ -102,6 +106,7 @@ export function RelationshipsPanel({
               >
                 {l.otherTitle}
               </Link>
+              {!readOnly && (
               <button
                 aria-label="Remove link"
                 onClick={() =>
@@ -120,12 +125,13 @@ export function RelationshipsPanel({
               >
                 ✕
               </button>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      {candidates.length > 0 && (
+      {!readOnly && candidates.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <select
             value={type}
