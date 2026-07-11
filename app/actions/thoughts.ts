@@ -42,3 +42,31 @@ export async function addThought(
   revalidatePath(`/projects/${projectId}`);
   return { ok: true, thought: data as Thought };
 }
+
+export type OlderThoughtsResult =
+  | { ok: true; thoughts: Thought[]; hasMore: boolean }
+  | { ok: false; error: string };
+
+const PAGE_SIZE = 50;
+
+export async function getOlderThoughts(
+  projectId: string,
+  beforeCreatedAt: string,
+): Promise<OlderThoughtsResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("thoughts")
+    .select("*")
+    .eq("project_id", projectId)
+    .lt("created_at", beforeCreatedAt)
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE + 1);
+
+  if (error) return { ok: false, error: error.message };
+  const rows = (data ?? []) as Thought[];
+  return {
+    ok: true,
+    thoughts: rows.slice(0, PAGE_SIZE),
+    hasMore: rows.length > PAGE_SIZE,
+  };
+}

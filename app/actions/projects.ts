@@ -52,6 +52,25 @@ export async function createProject(formData: FormData) {
     payload: { title, status },
   });
 
+  // Reviewed idea promotion — link the idea to its new project
+  const ideaId = String(formData.get("idea_id") ?? "").trim();
+  if (ideaId) {
+    const { error: ideaError } = await supabase
+      .from("ideas")
+      .update({ status: "promoted", promoted_to_project_id: data.id })
+      .eq("id", ideaId);
+    if (ideaError)
+      console.error("idea promotion update failed:", ideaError.message);
+    else
+      await writeAudit(supabase, {
+        entity_type: "idea",
+        entity_id: ideaId,
+        action: "promote_idea_to_project",
+        payload: { project_id: data.id },
+      });
+    revalidatePath("/ideas");
+  }
+
   revalidatePath("/");
   redirect(`/projects/${data.id}`);
 }

@@ -9,7 +9,21 @@ import { PROJECT_STATUSES } from "@/lib/types";
 const inputCls =
   "w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-[15px] outline-none transition-colors focus:border-moss";
 
-export function NewProjectForm() {
+export type ProjectFormDefaults = {
+  idea_id?: string;
+  title?: string;
+  summary?: string;
+  vision?: string;
+  why_it_matters?: string;
+  success_criteria?: string;
+  status?: string;
+};
+
+export function NewProjectForm({
+  defaults,
+}: {
+  defaults?: ProjectFormDefaults;
+}) {
   const [titleError, setTitleError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
@@ -31,9 +45,13 @@ export function NewProjectForm() {
 
   return (
     <form action={onSubmit} className="mt-6 space-y-5">
+      {defaults?.idea_id && (
+        <input type="hidden" name="idea_id" value={defaults.idea_id} />
+      )}
       <Field label="Title" required error={titleError}>
         <input
           name="title"
+          defaultValue={defaults?.title}
           className={inputCls}
           placeholder="Algo Trading Framework"
           aria-invalid={!!titleError}
@@ -44,6 +62,7 @@ export function NewProjectForm() {
       <Field label="One-line summary">
         <input
           name="summary"
+          defaultValue={defaults?.summary}
           className={inputCls}
           placeholder="What is this, in one sentence?"
         />
@@ -53,6 +72,7 @@ export function NewProjectForm() {
         <textarea
           name="vision"
           rows={3}
+          defaultValue={defaults?.vision}
           className={inputCls}
           placeholder="What does done-and-working look like?"
         />
@@ -62,6 +82,7 @@ export function NewProjectForm() {
         <textarea
           name="why_it_matters"
           rows={3}
+          defaultValue={defaults?.why_it_matters}
           className={inputCls}
           placeholder="Why is this worth your attention over months?"
         />
@@ -71,13 +92,18 @@ export function NewProjectForm() {
         <textarea
           name="success_criteria"
           rows={2}
+          defaultValue={defaults?.success_criteria}
           className={inputCls}
           placeholder="How will you know it worked?"
         />
       </Field>
 
       <Field label="Status">
-        <select name="status" defaultValue="Seed" className={inputCls}>
+        <select
+          name="status"
+          defaultValue={defaults?.status ?? "Seed"}
+          className={inputCls}
+        >
           {PROJECT_STATUSES.filter((s) => s !== "Archived").map((s) => (
             <option key={s} value={s}>
               {s}

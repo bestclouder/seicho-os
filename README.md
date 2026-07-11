@@ -1,41 +1,67 @@
-# vibe-stack-supabase
+# Seichō OS 成長
 
-Next.js 15 + Supabase starter for shipping vibe-coded apps fast. Clone, provision, build.
+A personal AI-powered project operating system that preserves the thinking,
+decisions, and evolving understanding behind long-running projects — so you can
+resume any of them months later in under a minute.
+
+Built from the plan in [`/docs`](docs/PRD.md). Demo-first: the homepage is the
+working app, no login required.
+
+## What works (v1)
+
+- **Dashboard** — all projects sorted by a rule-based momentum score (growth-ring
+  indicator), status filter pills, full-text search across projects and thoughts
+- **Projects** — create, inline-edit every charter field, status lifecycle
+  (Seed → Exploring → Active → Paused → Completed), archive with typed confirmation
+  (soft delete)
+- **Resume card** — on project open, an AI summary of the six understanding
+  fields (problem, why, learned, assumptions changed, best understanding,
+  highest-leverage next step) is generated from the project fields + last 20
+  thoughts; stale after 24 h; manual refresh; every value carries
+  source/confidence/review_status
+- **Thought capture** — sticky bottom composer, saves in <1 s, auto-classified
+  into insight / decision / assumption / task_draft / other
+- **Phases & tasks** — CRUD, reorder (persisted sort_order), task status cycles
+  todo → doing → done; **✦ Suggest phases** returns an AI draft you confirm
+  before anything is written
+- **Idea inbox** — capture raw ideas, promote to a project via an AI-drafted
+  charter you review first, dismiss/restore
+- **Project relationships** — typed links (related / depends on / blocks / inspires)
+- **Audit log** — every mutation and AI tool call writes an append-only row
+
+## AI configuration
+
+The app is fully functional with AI switched off (deterministic `heuristic:v1`
+fallbacks, honestly labeled with low confidence). To enable real model output,
+add **one** of these to Vercel env (server-side only):
+
+- `OPENAI_API_KEY` (+ optional `OPENAI_MODEL`, default `gpt-4o`)
+- `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`, default `claude-sonnet-5`)
+
+## Security status
+
+- v1 ships with the planned permissive demo RLS (`0001_init.sql`) — no real user
+  data yet.
+- The Sprint 4 owner-scoped lockdown is written at
+  [`supabase/migrations/0002_lockdown.sql`](supabase/migrations/0002_lockdown.sql)
+  but **not yet applied** — applying needs DB admin access (Supabase dashboard
+  SQL editor or service-role key), which isn't in this project's env. Run it
+  before onboarding real users.
+- Client bundle verified clean: `grep -r OPENAI_API_KEY .next/static` → 0 hits.
+- Security headers (frame denial, nosniff, referrer policy) set in
+  [`next.config.ts`](next.config.ts).
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 15 (App Router, React 19, Server Actions) |
-| Language | TypeScript strict |
-| Styles | Tailwind CSS v4 (CSS-first, no config file) |
-| Auth + DB | Supabase (`@supabase/ssr`) |
-| Package manager | Bun |
-| Deploy | Vercel |
+Next.js 15 (App Router) · Supabase (Postgres + RLS) · Tailwind v4 ·
+self-hosted fonts (Shippori Mincho / Inter / IBM Plex Mono) · Vercel
 
-## Quick start
+## Development
 
 ```bash
-bun install
-cp .env.example .env.local   # fill in your Supabase keys
-bun dev
+npm install
+npx vercel link && npx vercel env pull .env.local
+npm run dev
 ```
 
-Open http://localhost:3000. Edit `app/page.tsx` to start building.
-
-## Provisioning a new project
-
-Use the `/new-vibe-project <name>` skill (see `claude-dotfiles` repo) which:
-1. Clones this template and renames it
-2. Creates a new GitHub repo and pushes
-3. Creates a Supabase project and injects URL + anon key
-4. Creates a Vercel project linked to the GitHub repo
-5. Triggers first deploy and returns the preview URL
-
-## Working with AI
-
-See [CLAUDE.md](CLAUDE.md) for conventions. This repo is pre-wired for gstack — start with `/office-hours`.
-
-## Switching to Neon
-
-If you need Postgres without Supabase (e.g. prefer Drizzle ORM + Clerk for auth), a `vibe-stack-neon` variant is planned. For now: fork this and swap `@supabase/ssr` for `drizzle-orm` + `@neondatabase/serverless`, add Clerk or NextAuth.
+Deploy by git push to `main` — Vercel auto-deploys. Never `vercel deploy`.

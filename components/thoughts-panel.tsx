@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { addThought } from "@/app/actions/thoughts";
+import { addThought, getOlderThoughts } from "@/app/actions/thoughts";
 import { useToast } from "@/components/toast";
 import { TagBadge } from "@/components/tag-badge";
 import { timeAgo } from "@/lib/format";
@@ -10,15 +10,33 @@ import type { SectionTag, Thought } from "@/lib/types";
 export function ThoughtsPanel({
   projectId,
   initialThoughts,
+  initialHasMore = false,
 }: {
   projectId: string;
   initialThoughts: Thought[];
+  initialHasMore?: boolean;
 }) {
   const [thoughts, setThoughts] = useState<Thought[]>(initialThoughts);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [draft, setDraft] = useState("");
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const toast = useToast();
+
+  async function loadMore() {
+    const oldest = thoughts[thoughts.length - 1];
+    if (!oldest || loadingMore) return;
+    setLoadingMore(true);
+    const result = await getOlderThoughts(projectId, oldest.created_at);
+    setLoadingMore(false);
+    if (!result.ok) {
+      toast(result.error, "error");
+      return;
+    }
+    setThoughts((list) => [...list, ...result.thoughts]);
+    setHasMore(result.hasMore);
+  }
 
   function classify(thoughtId: string) {
     // Fire-and-forget AI tagging; the UI patches in the badge when it lands.
@@ -86,6 +104,16 @@ export function ThoughtsPanel({
             </li>
           ))}
         </ul>
+      )}
+
+      {hasMore && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="mt-3 w-full rounded-xl border border-line bg-card py-2.5 text-sm text-faint transition-colors hover:text-ink disabled:opacity-50"
+        >
+          {loadingMore ? "Loading…" : "Load older thoughts"}
+        </button>
       )}
 
       {/* Sticky capture bar — the five-second promise */}

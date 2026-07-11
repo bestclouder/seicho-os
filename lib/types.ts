@@ -93,6 +93,14 @@ export type ProjectSummary = {
   [K in SummaryField as `${K}_review_status`]: string | null;
 };
 
+export const RELATIONSHIP_TYPES = [
+  "related",
+  "depends_on",
+  "blocks",
+  "inspires",
+] as const;
+export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
+
 export type ProjectRelationship = {
   id: string;
   user_id: string | null;

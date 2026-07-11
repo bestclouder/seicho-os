@@ -1,18 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Inter, Shippori_Mincho } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ToastProvider } from "@/components/toast";
 
-const shippori = Shippori_Mincho({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+// Self-hosted (public/fonts) so builds never depend on Google Fonts uptime
+const shippori = localFont({
+  src: [
+    { path: "../public/fonts/shippori-mincho-500.woff2", weight: "500" },
+    { path: "../public/fonts/shippori-mincho-600.woff2", weight: "600" },
+    { path: "../public/fonts/shippori-mincho-700.woff2", weight: "700" },
+  ],
   variable: "--font-shippori",
+  display: "swap",
 });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
+const inter = localFont({
+  src: [
+    { path: "../public/fonts/inter-400.woff2", weight: "400" },
+    { path: "../public/fonts/inter-500.woff2", weight: "500" },
+    { path: "../public/fonts/inter-600.woff2", weight: "600" },
+  ],
+  variable: "--font-inter",
+  display: "swap",
+});
+const plexMono = localFont({
+  src: [
+    { path: "../public/fonts/ibm-plex-mono-400.woff2", weight: "400" },
+    { path: "../public/fonts/ibm-plex-mono-500.woff2", weight: "500" },
+  ],
   variable: "--font-plex-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {

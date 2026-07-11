@@ -16,6 +16,11 @@ import { ArchiveButton } from "@/components/archive-button";
 import { PhasesPanel } from "@/components/phases-panel";
 import { ThoughtsPanel } from "@/components/thoughts-panel";
 import { ResumeCard } from "@/components/resume-card";
+import {
+  RelationshipsPanel,
+  type LinkedProject,
+} from "@/components/relationships-panel";
+import type { ProjectRelationship } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +55,15 @@ export default async function ProjectPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data, error }, phasesRes, tasksRes, thoughtsRes, summaryRes] =
-    await Promise.all([
+  const [
+    { data, error },
+    phasesRes,
+    tasksRes,
+    thoughtsRes,
+    summaryRes,
+    relationshipsRes,
+    otherProjectsRes,
+  ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", id).maybeSingle(),
       supabase
         .from("phases")
@@ -68,7 +80,7 @@ export default async function ProjectPage({
         .select("*")
         .eq("project_id", id)
         .order("created_at", { ascending: false })
-        .limit(100),
+        .limit(51),
       supabase
         .from("project_summaries")
         .select("*")
@@ -76,6 +88,16 @@ export default async function ProjectPage({
         .order("generated_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("project_relationships")
+        .select("*")
+        .or(`source_project_id.eq.${id},target_project_id.eq.${id}`),
+      supabase
+        .from("projects")
+        .select("id,title")
+        .neq("status", "Archived")
+        .neq("id", id)
+        .order("title"),
     ]);
 
   if (error) {
@@ -95,6 +117,28 @@ export default async function ProjectPage({
   if (!data) notFound();
 
   const project = data as Project;
+  const allThoughts = (thoughtsRes.data ?? []) as Thought[];
+  const thoughts = allThoughts.slice(0, 50);
+  const hasMoreThoughts = allThoughts.length > 50;
+
+  const otherProjects = (otherProjectsRes.data ?? []) as {
+    id: string;
+    title: string;
+  }[];
+  const titleById = new Map(otherProjects.map((p) => [p.id, p.title]));
+  const links: LinkedProject[] = (
+    (relationshipsRes.data ?? []) as ProjectRelationship[]
+  ).map((r) => {
+    const direction = r.source_project_id === project.id ? "out" : "in";
+    const otherId =
+      direction === "out" ? r.target_project_id : r.source_project_id;
+    return {
+      relationship: r,
+      otherId,
+      otherTitle: titleById.get(otherId) ?? "Archived project",
+      direction,
+    };
+  });
 
   return (
     <>
@@ -129,7 +173,7 @@ export default async function ProjectPage({
         <ResumeCard
           projectId={project.id}
           initialSummary={(summaryRes.data ?? null) as ProjectSummary | null}
-          hasThoughts={(thoughtsRes.data ?? []).length > 0}
+          hasThoughts={thoughts.length > 0}
         />
 
         <section className="mt-8 space-y-6 rounded-xl border border-line bg-card p-5">
@@ -151,9 +195,16 @@ export default async function ProjectPage({
           initialTasks={(tasksRes.data ?? []) as Task[]}
         />
 
+        <RelationshipsPanel
+          projectId={project.id}
+          initialLinks={links}
+          otherProjects={otherProjects}
+        />
+
         <ThoughtsPanel
           projectId={project.id}
-          initialThoughts={(thoughtsRes.data ?? []) as Thought[]}
+          initialThoughts={thoughts}
+          initialHasMore={hasMoreThoughts}
         />
 
         <div className="mt-10 border-t border-line pt-6">
