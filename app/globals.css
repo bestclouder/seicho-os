@@ -1,1 +1,60 @@
 @import "tailwindcss";
+
+@theme {
+  --color-paper: #f4f6f0;
+  --color-card: #fcfdfb;
+  --color-ink: #1e2a22;
+  --color-faint: #64735f;
+  --color-line: #dce3d4;
+  --color-moss: #386a4b;
+  --color-moss-soft: #e4eee3;
+  --color-clay: #b4552d;
+  --color-clay-soft: #f4e6dd;
+  --color-indigo-ai: #46608c;
+  --color-indigo-soft: #e4e9f2;
+  --color-gold: #8a6d2f;
+  --color-gold-soft: #f0ead8;
+
+  --font-display: var(--font-shippori), "Shippori Mincho", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--color-paper);
+}
+
+body {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-moss);
+  color: var(--color-paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.35s ease-out both;
+}
