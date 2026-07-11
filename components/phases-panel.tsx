@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/phases";
 import { addTask, cycleTaskStatus, deleteTask } from "@/app/actions/tasks";
 import { useToast } from "@/components/toast";
+import { SuggestPhases } from "@/components/suggest-phases";
 import type { Phase, Task } from "@/lib/types";
 
 const PHASE_STATUS_LABEL: Record<Phase["status"], string> = {
@@ -160,6 +161,13 @@ export function PhasesPanel({
         >
           Add phase
         </button>
+        <SuggestPhases
+          projectId={projectId}
+          onApplied={(newPhases, newTasks) => {
+            setPhases((list) => [...list, ...newPhases]);
+            setTasks((list) => [...list, ...newTasks]);
+          }}
+        />
       </div>
     </section>
   );

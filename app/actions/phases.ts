@@ -94,6 +94,84 @@ export async function deletePhase(phaseId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+export type ApplyDraftResult =
+  | { ok: true; phases: Phase[]; tasks: import("@/lib/types").Task[] }
+  | { ok: false; error: string };
+
+/**
+ * Writes a user-CONFIRMED AI phase/task draft (docs/AGENTIC_LAYER.md:
+ * suggest_phases_and_tasks is medium risk — rows are only written here,
+ * after the confirmation tap).
+ */
+export async function applyPhaseDraft(
+  projectId: string,
+  draft: { title: string; tasks: string[] }[],
+): Promise<ApplyDraftResult> {
+  if (!Array.isArray(draft) || draft.length === 0)
+    return { ok: false, error: "Draft is empty." };
+
+  const supabase = await createClient();
+  const { data: maxRow } = await supabase
+    .from("phases")
+    .select("sort_order")
+    .eq("project_id", projectId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let order = maxRow?.sort_order ?? 0;
+  const createdPhases: Phase[] = [];
+  const createdTasks: import("@/lib/types").Task[] = [];
+
+  for (const item of draft.slice(0, 6)) {
+    const title = String(item.title ?? "").trim();
+    if (!title) continue;
+    order += 1;
+    const { data: phase, error } = await supabase
+      .from("phases")
+      .insert({ project_id: projectId, title, sort_order: order })
+      .select("*")
+      .single();
+    if (error || !phase)
+      return { ok: false, error: error?.message ?? "Could not write phases." };
+    createdPhases.push(phase as Phase);
+
+    const titles = (item.tasks ?? [])
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    if (titles.length > 0) {
+      const { data: tasks, error: taskError } = await supabase
+        .from("tasks")
+        .insert(
+          titles.map((t, i) => ({
+            project_id: projectId,
+            phase_id: phase.id,
+            title: t,
+            sort_order: i + 1,
+          })),
+        )
+        .select("*");
+      if (taskError)
+        return { ok: false, error: taskError.message };
+      createdTasks.push(...((tasks ?? []) as import("@/lib/types").Task[]));
+    }
+  }
+
+  await writeAudit(supabase, {
+    entity_type: "project",
+    entity_id: projectId,
+    action: "apply_phase_draft",
+    payload: {
+      phases: createdPhases.length,
+      tasks: createdTasks.length,
+    },
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+  return { ok: true, phases: createdPhases, tasks: createdTasks };
+}
+
 /** Persist a full ordering after a reorder gesture. */
 export async function reorderPhases(
   projectId: string,

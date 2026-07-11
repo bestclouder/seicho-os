@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Phase, Project, Task, Thought } from "@/lib/types";
+import type {
+  Phase,
+  Project,
+  ProjectSummary,
+  Task,
+  Thought,
+} from "@/lib/types";
 import { timeAgo } from "@/lib/format";
 import { AppHeader } from "@/components/app-header";
 import { InlineEdit } from "@/components/inline-edit";
@@ -9,6 +15,7 @@ import { StatusPicker } from "@/components/status-picker";
 import { ArchiveButton } from "@/components/archive-button";
 import { PhasesPanel } from "@/components/phases-panel";
 import { ThoughtsPanel } from "@/components/thoughts-panel";
+import { ResumeCard } from "@/components/resume-card";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +50,7 @@ export default async function ProjectPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data, error }, phasesRes, tasksRes, thoughtsRes] =
+  const [{ data, error }, phasesRes, tasksRes, thoughtsRes, summaryRes] =
     await Promise.all([
       supabase.from("projects").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -62,6 +69,13 @@ export default async function ProjectPage({
         .eq("project_id", id)
         .order("created_at", { ascending: false })
         .limit(100),
+      supabase
+        .from("project_summaries")
+        .select("*")
+        .eq("project_id", id)
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
   if (error) {
@@ -111,6 +125,12 @@ export default async function ProjectPage({
             placeholder="One sentence: what is this?"
           />
         </div>
+
+        <ResumeCard
+          projectId={project.id}
+          initialSummary={(summaryRes.data ?? null) as ProjectSummary | null}
+          hasThoughts={(thoughtsRes.data ?? []).length > 0}
+        />
 
         <section className="mt-8 space-y-6 rounded-xl border border-line bg-card p-5">
           {FIELDS.map((f) => (
