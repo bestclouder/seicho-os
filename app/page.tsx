@@ -30,6 +30,10 @@ export default async function Dashboard({
     .neq("status", "Archived")
     .order("last_updated", { ascending: false });
   if (filter !== "All") projectsQuery = projectsQuery.eq("status", filter);
+  // Signed-in users see their own workspace; the shared demo rows are for
+  // anonymous visitors (RLS already scopes what each caller can read at all)
+  if (access.lockdownApplied && access.userId)
+    projectsQuery = projectsQuery.eq("user_id", access.userId);
 
   const [projectsRes, phasesRes, thoughtsRes] = await Promise.all([
     projectsQuery,

@@ -11,11 +11,15 @@ export const dynamic = "force-dynamic";
 export default async function IdeasPage() {
   const supabase = await createClient();
   const access = await getAccess(supabase);
-  const { data, error } = await supabase
+  let ideasQuery = supabase
     .from("ideas")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(200);
+  // Signed-in users get their own inbox, not the shared demo's
+  if (access.lockdownApplied && access.userId)
+    ideasQuery = ideasQuery.eq("user_id", access.userId);
+  const { data, error } = await ideasQuery;
 
   if (error) {
     return (

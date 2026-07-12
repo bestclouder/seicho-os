@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import type { Project, Thought } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -25,19 +26,29 @@ export default async function SearchPage({
 
   if (query) {
     const supabase = await createClient();
+    const access = await getAccess(supabase);
     const like = `%${escapeLike(query)}%`;
+
+    let projectsQuery = supabase
+      .from("projects")
+      .select("*")
+      .or(`title.ilike.${like},summary.ilike.${like},vision.ilike.${like}`)
+      .limit(25);
+    let thoughtsQuery = supabase
+      .from("thoughts")
+      .select("*, projects(title)")
+      .ilike("body", like)
+      .order("created_at", { ascending: false })
+      .limit(25);
+    // Signed-in users search their own workspace, not the shared demo
+    if (access.lockdownApplied && access.userId) {
+      projectsQuery = projectsQuery.eq("user_id", access.userId);
+      thoughtsQuery = thoughtsQuery.eq("user_id", access.userId);
+    }
+
     const [projectsRes, thoughtsRes] = await Promise.all([
-      supabase
-        .from("projects")
-        .select("*")
-        .or(`title.ilike.${like},summary.ilike.${like},vision.ilike.${like}`)
-        .limit(25),
-      supabase
-        .from("thoughts")
-        .select("*, projects(title)")
-        .ilike("body", like)
-        .order("created_at", { ascending: false })
-        .limit(25),
+      projectsQuery,
+      thoughtsQuery,
     ]);
     error = projectsRes.error?.message ?? thoughtsRes.error?.message ?? null;
     projects = (projectsRes.data ?? []) as Project[];

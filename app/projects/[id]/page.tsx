@@ -99,7 +99,7 @@ export default async function ProjectPage({
         .or(`source_project_id.eq.${id},target_project_id.eq.${id}`),
       supabase
         .from("projects")
-        .select("id,title")
+        .select("id,title,user_id")
         .neq("status", "Archived")
         .neq("id", id)
         .order("title"),
@@ -134,8 +134,16 @@ export default async function ProjectPage({
   const otherProjects = (otherProjectsRes.data ?? []) as {
     id: string;
     title: string;
+    user_id: string | null;
   }[];
+  // Titles resolve against everything visible (so demo↔demo links render),
+  // but the link picker only offers the signed-in user's own projects
   const titleById = new Map(otherProjects.map((p) => [p.id, p.title]));
+  const pickerCandidates = (
+    access.lockdownApplied && access.userId
+      ? otherProjects.filter((p) => p.user_id === access.userId)
+      : otherProjects
+  ).map(({ id: pid, title }) => ({ id: pid, title }));
   const links: LinkedProject[] = (
     (relationshipsRes.data ?? []) as ProjectRelationship[]
   ).map((r) => {
@@ -230,7 +238,7 @@ export default async function ProjectPage({
         <RelationshipsPanel
           projectId={project.id}
           initialLinks={links}
-          otherProjects={otherProjects}
+          otherProjects={pickerCandidates}
           readOnly={readOnly}
         />
 
