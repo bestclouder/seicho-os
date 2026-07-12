@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Access } from "@/lib/access";
+import { RequestExtension } from "@/components/request-extension";
 
 /** One-line plan banner under the header. Renders nothing for full access. */
 export function AccessBanner({ access }: { access: Access }) {
@@ -13,7 +14,7 @@ export function AccessBanner({ access }: { access: Access }) {
           <Link href="/login" className="font-medium underline underline-offset-4">
             Sign up
           </Link>{" "}
-          to build your own workspace (free for 7 days).
+          to build your own workspace (free for 30 days).
         </p>
       </div>
     );
@@ -23,8 +24,9 @@ export function AccessBanner({ access }: { access: Access }) {
     return (
       <div className="border-b border-line bg-clay-soft/70">
         <p className="mx-auto max-w-2xl px-4 py-2 text-sm text-clay">
-          Your 7-day trial has ended — your workspace is now view-only. All
-          your content stays readable.
+          Your 30-day trial has ended — your workspace is view-only and all
+          your content stays readable.{" "}
+          <RequestExtension pending={access.extensionPending} />
         </p>
       </div>
     );

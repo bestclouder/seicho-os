@@ -10,9 +10,9 @@ export default function LoginPage() {
           Sign in or sign up
         </h1>
         <p className="mt-1 text-sm text-faint">
-          One magic link does both. New accounts get full access for 7 days —
-          after that your workspace stays readable but becomes view-only. No
-          account needed to browse the demo.
+          One magic link does both. New accounts get full access for 30 days —
+          after that your workspace stays readable (view-only) and you can
+          request an extension. No account needed to browse the demo.
         </p>
         <LoginForm />
       </main>

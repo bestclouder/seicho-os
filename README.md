@@ -48,8 +48,10 @@ database:
   publicly readable and frozen; anyone can explore without an account.
 - **Sign up** (magic link, one link does sign-in and sign-up) — a `profiles`
   row is auto-created: `bestclouder@gmail.com` gets the `lifetime` plan;
-  everyone else gets a `trial` — full access for 7 days, then their workspace
-  turns view-only (content stays readable, writes are refused).
+  everyone else gets a `trial` — full access for 30 days, then their workspace
+  turns view-only (content stays readable, writes are refused). Expired users
+  can file one extension request; grant it by bumping
+  `profiles.trial_expires_at` (see `0004_trial_30d_extensions.sql`).
 - Enforcement is owner-scoped RLS + a `can_write()` plan gate in Postgres; the
   UI mirrors it (banners, hidden editors) but the database is the authority.
 - Audit logs are append-only. Client bundle verified clean of secrets.

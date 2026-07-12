@@ -31,8 +31,8 @@ export default async function NewProjectPage({
           </p>
           <p className="mt-1 text-sm text-faint">
             {access.userId
-              ? "Everything you built stays readable."
-              : "Free full access for 7 days, view-only after that."}
+              ? "Everything you built stays readable — request an extension from the banner above."
+              : "Free full access for 30 days; view-only after that with extensions on request."}
           </p>
           <Link
             href={access.userId ? "/" : "/login"}
