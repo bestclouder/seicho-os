@@ -129,6 +129,14 @@ export default async function Dashboard({
           >
             Ideas
           </Link>
+          {access.canWrite && (
+            <Link
+              href="/import"
+              className="min-h-11 shrink-0 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-faint transition-colors hover:text-ink"
+            >
+              Import
+            </Link>
+          )}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-1.5">
