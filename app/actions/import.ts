@@ -136,7 +136,7 @@ export async function applyImport(
     user_id: userId,
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/ideas");
   return {
     ok: true,

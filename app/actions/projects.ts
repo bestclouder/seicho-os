@@ -86,7 +86,7 @@ export async function createProject(formData: FormData) {
     revalidatePath("/ideas");
   }
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   redirect(`/projects/${data.id}`);
 }
 
@@ -119,7 +119,7 @@ export async function updateProjectField(
   });
 
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -145,7 +145,7 @@ export async function setProjectStatus(
   });
 
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -153,7 +153,7 @@ export async function setProjectStatus(
 export async function archiveProject(projectId: string): Promise<ActionResult> {
   const result = await setProjectStatus(projectId, "Archived");
   if (result.ok) {
-    revalidatePath("/");
+    revalidatePath("/dashboard");
   }
   return result;
 }
@@ -184,6 +184,6 @@ export async function updateProjectTags(
   });
 
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true };
 }

@@ -34,6 +34,6 @@ export async function requestExtension(): Promise<ExtensionResult> {
     user_id: user.id,
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true, alreadyPending: false };
 }

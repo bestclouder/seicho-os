@@ -110,7 +110,7 @@ export function ImportWizard() {
       toast(
         `Imported ${result.projects} project${result.projects === 1 ? "" : "s"}, ${result.thoughts} thought${result.thoughts === 1 ? "" : "s"}, ${result.tasks} task${result.tasks === 1 ? "" : "s"}, ${result.ideas} idea${result.ideas === 1 ? "" : "s"}`,
       );
-      router.push("/");
+      router.push("/dashboard");
     });
   }
 

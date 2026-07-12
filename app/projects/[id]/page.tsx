@@ -112,7 +112,7 @@ export default async function ProjectPage({
         <main className="mx-auto max-w-2xl px-4 py-16 text-center">
           <p className="font-display text-lg">Couldn&apos;t load this project.</p>
           <p className="mt-2 text-sm text-faint">{error.message}</p>
-          <Link href="/" className="mt-4 inline-block text-sm text-moss underline">
+          <Link href="/dashboard" className="mt-4 inline-block text-sm text-moss underline">
             Back to dashboard
           </Link>
         </main>

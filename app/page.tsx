@@ -1,247 +1,163 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/access";
-import { momentumScore } from "@/lib/momentum";
-import { timeAgo } from "@/lib/format";
-import type { Phase, Project, Thought } from "@/lib/types";
-import { AppHeader } from "@/components/app-header";
-import { AccessBanner } from "@/components/access-banner";
-import { StatusBadge } from "@/components/status-badge";
 import { GrowthRing } from "@/components/growth-ring";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS = ["All", "Active", "Exploring", "Paused", "Seed", "Completed"];
+const STAGES: { word: string; ring: number }[] = [
+  { word: "Capture", ring: 8 },
+  { word: "Clarify", ring: 30 },
+  { word: "Grow", ring: 55 },
+  { word: "Return", ring: 80 },
+  { word: "Complete", ring: 100 },
+];
 
-export default async function Dashboard({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; tag?: string }>;
-}) {
-  const { status, tag } = await searchParams;
-  const filter = FILTERS.includes(status ?? "") ? status! : "All";
-  const tagFilter = (tag ?? "").trim().toLowerCase() || null;
+const FADE_LINES = [
+  "They disappear because life gets busy.",
+  "Priorities change.",
+  "Momentum fades.",
+  "Context is lost.",
+];
+
+export default async function Landing() {
   const supabase = await createClient();
   const access = await getAccess(supabase);
 
-  let projectsQuery = supabase
-    .from("projects")
-    .select("*")
-    .neq("status", "Archived")
-    .order("last_updated", { ascending: false });
-  if (filter !== "All") projectsQuery = projectsQuery.eq("status", filter);
-  // Signed-in users see their own workspace; the shared demo rows are for
-  // anonymous visitors (RLS already scopes what each caller can read at all)
-  if (access.lockdownApplied && access.userId)
-    projectsQuery = projectsQuery.eq("user_id", access.userId);
-
-  const [projectsRes, phasesRes, thoughtsRes] = await Promise.all([
-    projectsQuery,
-    supabase.from("phases").select("project_id,status"),
-    supabase
-      .from("thoughts")
-      .select("project_id,created_at")
-      .order("created_at", { ascending: false })
-      .limit(500),
-  ]);
-
-  if (projectsRes.error) {
-    return (
-      <>
-        <AppHeader />
-        <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-          <p className="font-display text-lg">Couldn&apos;t reach the database.</p>
-          <p className="mt-2 text-sm text-faint">
-            {projectsRes.error.message} — check your connection and reload.
-          </p>
-        </main>
-      </>
-    );
-  }
-
-  const projects = (projectsRes.data ?? []) as Project[];
-  const phases = (phasesRes.data ?? []) as Pick<Phase, "project_id" | "status">[];
-  const thoughts = (thoughtsRes.data ?? []) as Pick<
-    Thought,
-    "project_id" | "created_at"
-  >[];
-
-  // Tags exist only once 0003_add_tags.sql is applied; select("*") makes
-  // detection free — the field is simply absent before then.
-  const tagsEnabled = projects.some((p) => Array.isArray(p.tags));
-  const allTags = tagsEnabled
-    ? [...new Set(projects.flatMap((p) => p.tags ?? []))].sort()
-    : [];
-  const visible = tagFilter
-    ? projects.filter((p) => (p.tags ?? []).includes(tagFilter))
-    : projects;
-
-  const scored = visible
-    .map((project) => {
-      const projectPhases = phases.filter((p) => p.project_id === project.id);
-      const lastThought =
-        thoughts.find((t) => t.project_id === project.id) ?? null;
-      return {
-        project,
-        score: momentumScore(
-          project,
-          projectPhases as Pick<Phase, "status">[],
-          lastThought,
-        ),
-      };
-    })
-    .sort((a, b) => b.score - a.score);
+  // Signed-in people don't need the pitch — straight to their workspace
+  if (access.userId) redirect("/dashboard");
 
   return (
     <>
-      <AppHeader
-        action={
-          access.canWrite ? (
-            <Link
-              href="/projects/new"
-              className="rounded-lg bg-moss px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            >
-              New project
-            </Link>
-          ) : !access.userId ? (
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
+          <span className="flex items-baseline gap-2">
+            <span className="font-display text-lg font-semibold tracking-tight">
+              Seichō OS
+            </span>
+            <span aria-hidden className="font-display text-xs text-faint">
+              成長
+            </span>
+          </span>
+          <Link
+            href="/login"
+            className="font-mono text-[11px] uppercase tracking-wider text-faint underline-offset-4 hover:underline"
+          >
+            Sign in
+          </Link>
+        </div>
+      </header>
+
+      <main>
+        {/* ── hero ─────────────────────────────────────────────────────── */}
+        <section className="mx-auto max-w-3xl px-4 pb-20 pt-20 text-center sm:pt-28">
+          <p className="animate-rise font-mono text-[11px] uppercase tracking-[0.25em] text-faint">
+            Seichō OS · 成長 · growth
+          </p>
+          <h1
+            className="animate-rise mx-auto mt-6 max-w-xl font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl"
+            style={{ animationDelay: "0.1s" }}
+          >
+            Ideas deserve the chance to become reality.
+          </h1>
+          <p
+            className="animate-rise mx-auto mt-5 max-w-md text-[17px] leading-relaxed text-faint"
+            style={{ animationDelay: "0.2s" }}
+          >
+            A personal operating system for growing meaningful ideas into
+            meaningful work.
+          </p>
+          <div
+            className="animate-rise mt-9 flex items-center justify-center gap-3"
+            style={{ animationDelay: "0.3s" }}
+          >
             <Link
               href="/login"
-              className="rounded-lg bg-moss px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="min-h-12 rounded-xl bg-moss px-7 py-3 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
             >
-              Sign up
+              Start Building
             </Link>
-          ) : undefined
-        }
-      />
-      <AccessBanner access={access} />
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-        <div className="flex items-center gap-2">
-          <form action="/search" className="min-w-0 flex-1">
-            <input
-              name="q"
-              placeholder="Search projects and thoughts…"
-              className="min-h-11 w-full rounded-xl border border-line bg-card px-3.5 text-[15px] outline-none focus:border-moss"
-            />
-          </form>
-          <Link
-            href="/ideas"
-            className="min-h-11 shrink-0 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-faint transition-colors hover:text-ink"
-          >
-            Ideas
-          </Link>
-          {access.canWrite && (
             <Link
-              href="/import"
-              className="min-h-11 shrink-0 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-faint transition-colors hover:text-ink"
+              href="/demo"
+              className="min-h-12 rounded-xl border border-line bg-card px-6 py-3 text-[15px] text-ink transition-colors hover:border-moss"
             >
-              Import
-            </Link>
-          )}
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => (
-            <Link
-              key={f}
-              href={f === "All" ? "/" : `/?status=${f}`}
-              className={`rounded-full border px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors ${
-                filter === f
-                  ? "border-moss bg-moss text-white"
-                  : "border-line bg-card text-faint hover:text-ink"
-              }`}
-            >
-              {f}
-            </Link>
-          ))}
-        </div>
-
-        {allTags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {allTags.map((t) => (
-              <Link
-                key={t}
-                href={
-                  tagFilter === t
-                    ? filter === "All"
-                      ? "/"
-                      : `/?status=${filter}`
-                    : `/?${filter === "All" ? "" : `status=${filter}&`}tag=${encodeURIComponent(t)}`
-                }
-                className={`rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors ${
-                  tagFilter === t
-                    ? "border-indigo-ai bg-indigo-ai text-white"
-                    : "border-line bg-card text-faint hover:text-ink"
-                }`}
-              >
-                #{t}
-              </Link>
-            ))}
-          </div>
-        )}
-
-        <div className="mb-4 mt-5 flex items-baseline justify-between">
-          <h1 className="font-display text-sm font-medium text-faint">
-            {scored.length} project{scored.length === 1 ? "" : "s"}, sorted by
-            momentum
-          </h1>
-        </div>
-
-        {scored.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-card px-6 py-16 text-center">
-            <p className="font-display text-lg">
-              {filter === "All" ? "No projects yet" : `No ${filter} projects`}
-            </p>
-            <p className="mt-1 text-sm text-faint">
-              {filter === "All"
-                ? "Create your first one — it takes under a minute."
-                : "Try a different filter, or create a project."}
-            </p>
-            <Link
-              href={access.canWrite ? "/projects/new" : "/login"}
-              className="mt-5 inline-block rounded-lg bg-moss px-4 py-2.5 text-sm font-medium text-white"
-            >
-              {access.canWrite ? "Create a project" : "Sign up to create projects"}
+              View the demo
             </Link>
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {scored.map(({ project, score }) => (
-              <li key={project.id} className="animate-rise">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="block rounded-xl border border-line bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+        </section>
+
+        {/* ── why ideas die ────────────────────────────────────────────── */}
+        <section className="border-t border-line bg-card/60">
+          <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+            <h2 className="font-display text-2xl font-semibold leading-snug sm:text-3xl">
+              Great ideas rarely disappear
+              <br />
+              because they&apos;re bad.
+            </h2>
+            <div className="mt-8 space-y-2.5 font-display text-lg text-faint">
+              {FADE_LINES.map((line, i) => (
+                <p key={line} style={{ opacity: 1 - i * 0.18 }}>
+                  {line}
+                </p>
+              ))}
+            </div>
+            <p className="mx-auto mt-10 max-w-md text-[17px] leading-relaxed">
+              Seichō OS remembers where you left off
+              <br className="hidden sm:block" /> so you can continue building
+              what matters.
+            </p>
+          </div>
+        </section>
+
+        {/* ── the five stages ──────────────────────────────────────────── */}
+        <section className="border-t border-line">
+          <div className="mx-auto max-w-3xl px-4 py-20">
+            <ol className="flex flex-wrap items-start justify-center gap-x-2 gap-y-8 sm:flex-nowrap sm:justify-between">
+              {STAGES.map(({ word, ring }, i) => (
+                <li
+                  key={word}
+                  className="flex min-w-[72px] flex-1 flex-col items-center gap-3"
                 >
-                  <div className="flex items-start gap-3">
-                    <GrowthRing score={score} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <h2 className="font-display truncate text-[17px] font-semibold leading-snug">
-                          {project.title}
-                        </h2>
-                        <StatusBadge status={project.status} />
-                      </div>
-                      {project.summary && (
-                        <p className="mt-1 line-clamp-2 text-sm text-faint">
-                          {project.summary}
-                        </p>
-                      )}
-                      <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-faint/80">
-                        updated {timeAgo(project.last_updated)} · momentum{" "}
-                        {score}
-                        {(project.tags ?? []).length > 0 && (
-                          <span className="normal-case text-moss">
-                            {" "}
-                            · {(project.tags ?? []).map((t) => `#${t}`).join(" ")}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <GrowthRing score={ring} size={44} />
+                  <span className="font-display text-[15px] font-semibold">
+                    {word}
+                  </span>
+                  {i < STAGES.length - 1 && <span className="sr-only">then</span>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* ── closing ──────────────────────────────────────────────────── */}
+        <section className="border-t border-line bg-ink text-paper">
+          <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+            <p className="font-display text-2xl font-semibold leading-snug sm:text-3xl">
+              Not another productivity tool.
+            </p>
+            <p className="mt-2 font-display text-2xl leading-snug text-paper/70 sm:text-3xl">
+              A companion for your life&apos;s work.
+            </p>
+            <div className="mt-10 flex items-center justify-center gap-3">
+              <Link
+                href="/login"
+                className="min-h-12 rounded-xl bg-paper px-7 py-3 text-[15px] font-medium text-ink transition-opacity hover:opacity-90"
+              >
+                Start Building
+              </Link>
+              <Link
+                href="/demo"
+                className="min-h-12 rounded-xl border border-paper/25 px-6 py-3 text-[15px] text-paper/90 transition-colors hover:border-paper/60"
+              >
+                View the demo
+              </Link>
+            </div>
+            <p className="mt-12 font-mono text-[10px] uppercase tracking-[0.25em] text-paper/40">
+              free for 30 days · your work stays readable forever
+            </p>
+          </div>
+        </section>
       </main>
     </>
   );
