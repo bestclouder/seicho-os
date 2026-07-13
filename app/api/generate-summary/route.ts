@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient, getUserId } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
+import { aiActionsInLastHour, AI_HOURLY_LIMIT } from "@/lib/rate-limit";
 import { writeAudit } from "@/lib/audit";
 import { callAiJson } from "@/lib/ai/provider";
 import { HEURISTIC_SOURCE, summaryHeuristic } from "@/lib/ai/heuristic";
@@ -56,6 +58,23 @@ export async function POST(request: Request) {
     Date.now() - new Date(existing.generated_at).getTime() < STALE_MS;
   if (existing && isFresh && !force) {
     return NextResponse.json({ summary: existing, regenerated: false });
+  }
+
+  // Generating a summary is a paid, write-scoped action. Gate it on an active
+  // plan + per-user AI budget; read-only callers (demo viewers, expired
+  // trials) fall back to the last stored summary instead of triggering AI.
+  const access = await getAccess(supabase);
+  const canGenerate =
+    Boolean(access.userId) &&
+    access.canWrite &&
+    (await aiActionsInLastHour(supabase, access.userId!)) < AI_HOURLY_LIMIT;
+  if (!canGenerate) {
+    if (existing)
+      return NextResponse.json({ summary: existing, regenerated: false });
+    return NextResponse.json(
+      { error: "Sign in to generate summaries." },
+      { status: 403 },
+    );
   }
 
   const thoughts = (thoughtsRes.data ?? []) as Thought[];
@@ -118,7 +137,7 @@ export async function POST(request: Request) {
   const row: Record<string, unknown> = {
     project_id: projectId,
     generated_at: new Date().toISOString(),
-    user_id: await getUserId(supabase),
+    user_id: access.userId,
   };
   for (const f of SUMMARY_FIELDS) {
     row[f] = fields[f].value;
@@ -155,6 +174,7 @@ export async function POST(request: Request) {
     entity_id: inserted.id,
     action: force ? "regenerate_summary" : "generate_project_summary",
     payload: { project_id: projectId, source, thought_count: thoughts.length },
+    user_id: access.userId,
   });
 
   return NextResponse.json({ summary: inserted, regenerated: true });

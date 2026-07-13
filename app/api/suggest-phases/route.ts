@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
+import { aiActionsInLastHour, AI_HOURLY_LIMIT } from "@/lib/rate-limit";
 import { writeAudit } from "@/lib/audit";
 import { callAiJson } from "@/lib/ai/provider";
 import { HEURISTIC_SOURCE, suggestPhasesHeuristic } from "@/lib/ai/heuristic";
@@ -27,6 +29,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "project_id required" }, { status: 400 });
 
   const supabase = await createClient();
+
+  const access = await getAccess(supabase);
+  if (!access.userId)
+    return NextResponse.json({ error: "Sign in to suggest phases." }, { status: 401 });
+  if (!access.canWrite)
+    return NextResponse.json(
+      { error: "Your trial has ended — AI actions are paused." },
+      { status: 403 },
+    );
+  if ((await aiActionsInLastHour(supabase, access.userId)) >= AI_HOURLY_LIMIT)
+    return NextResponse.json(
+      { error: "AI limit reached — try again in an hour." },
+      { status: 429 },
+    );
+
   const { data: project } = await supabase
     .from("projects")
     .select("*")
@@ -75,6 +92,7 @@ export async function POST(request: Request) {
     entity_id: projectId,
     action: "suggest_phases_and_tasks",
     payload: { source, phase_count: phases.length },
+    user_id: access.userId,
   });
 
   return NextResponse.json({ phases, source });
