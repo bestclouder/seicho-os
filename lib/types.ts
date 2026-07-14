@@ -8,6 +8,24 @@ export const PROJECT_STATUSES = [
 ] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
+/**
+ * Object types (0007). A project has a finish line; a journey is ongoing with
+ * no "done"; an area is a container that holds projects and journeys.
+ */
+export const PROJECT_KINDS = ["project", "journey", "area"] as const;
+export type ProjectKind = (typeof PROJECT_KINDS)[number];
+
+/** Journeys never "complete" — their statuses are about intent, not progress. */
+export const JOURNEY_STATUSES = [
+  "Active",
+  "Paused",
+  "Archived",
+] as const satisfies readonly ProjectStatus[];
+
+export function statusesForKind(kind: ProjectKind): readonly ProjectStatus[] {
+  return kind === "project" ? PROJECT_STATUSES : JOURNEY_STATUSES;
+}
+
 export type Project = {
   id: string;
   user_id: string | null;
@@ -23,6 +41,9 @@ export type Project = {
   created_at: string;
   /** Present only after supabase/migrations/0003_add_tags.sql is applied. */
   tags?: string[];
+  /** Present only after supabase/migrations/0007_object_types.sql is applied. */
+  kind?: ProjectKind;
+  parent_id?: string | null;
 };
 
 export type Phase = {

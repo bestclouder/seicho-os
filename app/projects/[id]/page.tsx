@@ -15,6 +15,7 @@ import { AccessBanner } from "@/components/access-banner";
 import { InlineEdit } from "@/components/inline-edit";
 import { StatusBadge } from "@/components/status-badge";
 import { StatusPicker } from "@/components/status-picker";
+import { KindBadge } from "@/components/kind-badge";
 import { ArchiveButton } from "@/components/archive-button";
 import { PhasesPanel } from "@/components/phases-panel";
 import { ThoughtsPanel } from "@/components/thoughts-panel";
@@ -68,6 +69,7 @@ export default async function ProjectPage({
     summaryRes,
     relationshipsRes,
     otherProjectsRes,
+    childrenRes,
   ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -103,6 +105,12 @@ export default async function ProjectPage({
         .neq("status", "Archived")
         .neq("id", id)
         .order("title"),
+      supabase
+        .from("projects")
+        .select("id,title,kind,status")
+        .eq("parent_id", id)
+        .neq("status", "Archived")
+        .order("title"),
     ]);
 
   if (error) {
@@ -122,6 +130,20 @@ export default async function ProjectPage({
   if (!data) notFound();
 
   const project = data as Project;
+  const isArea = project.kind === "area";
+  const children = (childrenRes.data ?? []) as Pick<
+    Project,
+    "id" | "title" | "kind" | "status"
+  >[];
+  let parentArea: { id: string; title: string } | null = null;
+  if (project.parent_id) {
+    const { data: par } = await supabase
+      .from("projects")
+      .select("id,title")
+      .eq("id", project.parent_id)
+      .maybeSingle();
+    parentArea = (par as { id: string; title: string } | null) ?? null;
+  }
   // Demo rows (user_id null) are read-only for everyone once locked down;
   // owned rows are writable only with an active plan. RLS enforces this
   // server-side — the flag just keeps the UI honest.
@@ -165,12 +187,29 @@ export default async function ProjectPage({
           readOnly ? (
             <StatusBadge status={project.status} />
           ) : (
-            <StatusPicker projectId={project.id} status={project.status} />
+            <StatusPicker
+              projectId={project.id}
+              status={project.status}
+              kind={project.kind}
+            />
           )
         }
       />
       <AccessBanner access={access} />
       <main className="mx-auto max-w-2xl px-4 pb-40 pt-6">
+        {(parentArea || (project.kind && project.kind !== "project")) && (
+          <div className="mb-1 flex items-center gap-2">
+            {parentArea && (
+              <Link
+                href={`/projects/${parentArea.id}`}
+                className="font-mono text-[11px] uppercase tracking-wider text-faint underline-offset-4 hover:text-ink hover:underline"
+              >
+                ← {parentArea.title}
+              </Link>
+            )}
+            <KindBadge kind={project.kind} />
+          </div>
+        )}
         <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
           updated {timeAgo(project.last_updated)}
           {project.start_date && ` · started ${project.start_date}`}
@@ -200,47 +239,84 @@ export default async function ProjectPage({
           />
         </div>
 
-        <ResumeCard
-          projectId={project.id}
-          initialSummary={(summaryRes.data ?? null) as ProjectSummary | null}
-          hasThoughts={thoughts.length > 0}
-          readOnly={readOnly}
-        />
+        {!isArea && (
+          <ResumeCard
+            projectId={project.id}
+            initialSummary={(summaryRes.data ?? null) as ProjectSummary | null}
+            hasThoughts={thoughts.length > 0}
+            readOnly={readOnly}
+          />
+        )}
 
-        <section className="mt-8 space-y-6 rounded-xl border border-line bg-card p-5">
-          {FIELDS.map((f) => (
-            <InlineEdit
-              key={f.field}
+        {!isArea && (
+          <section className="mt-8 space-y-6 rounded-xl border border-line bg-card p-5">
+            {FIELDS.map((f) => (
+              <InlineEdit
+                key={f.field}
+                projectId={project.id}
+                field={f.field}
+                label={f.label}
+                value={project[f.field as keyof Project] as string | null}
+                placeholder={f.placeholder}
+                readOnly={readOnly}
+              />
+            ))}
+            {Array.isArray(project.tags) && (
+              <TagEditor
+                projectId={project.id}
+                initialTags={project.tags}
+                readOnly={readOnly}
+              />
+            )}
+          </section>
+        )}
+
+        {isArea ? (
+          <section className="mt-8">
+            <h2 className="mb-3 font-mono text-[11px] uppercase tracking-wider text-faint">
+              Contains · {children.length}
+            </h2>
+            {children.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line bg-card px-4 py-8 text-center text-sm text-faint">
+                Nothing filed here yet. New projects and journeys can pick this
+                area.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {children.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      href={`/projects/${c.id}`}
+                      className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-shadow hover:shadow-md"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold">
+                        {c.title}
+                      </span>
+                      <KindBadge kind={c.kind} />
+                      <StatusBadge status={c.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : (
+          <>
+            <PhasesPanel
               projectId={project.id}
-              field={f.field}
-              label={f.label}
-              value={project[f.field as keyof Project] as string | null}
-              placeholder={f.placeholder}
+              initialPhases={(phasesRes.data ?? []) as Phase[]}
+              initialTasks={(tasksRes.data ?? []) as Task[]}
               readOnly={readOnly}
             />
-          ))}
-          {Array.isArray(project.tags) && (
-            <TagEditor
+
+            <RelationshipsPanel
               projectId={project.id}
-              initialTags={project.tags}
+              initialLinks={links}
+              otherProjects={pickerCandidates}
               readOnly={readOnly}
             />
-          )}
-        </section>
-
-        <PhasesPanel
-          projectId={project.id}
-          initialPhases={(phasesRes.data ?? []) as Phase[]}
-          initialTasks={(tasksRes.data ?? []) as Task[]}
-          readOnly={readOnly}
-        />
-
-        <RelationshipsPanel
-          projectId={project.id}
-          initialLinks={links}
-          otherProjects={pickerCandidates}
-          readOnly={readOnly}
-        />
+          </>
+        )}
 
         <ThoughtsPanel
           projectId={project.id}

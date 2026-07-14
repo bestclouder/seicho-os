@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, getUserId } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
-import { PROJECT_STATUSES, type ProjectStatus } from "@/lib/types";
+import {
+  PROJECT_KINDS,
+  PROJECT_STATUSES,
+  type ProjectKind,
+  type ProjectStatus,
+} from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -23,6 +28,8 @@ export async function createProject(formData: FormData) {
   if (!title) return { ok: false as const, error: "Title is required." };
 
   const status = String(formData.get("status") ?? "Seed");
+  const kind = String(formData.get("kind") ?? "project");
+  const parentId = String(formData.get("parent_id") ?? "").trim();
   const supabase = await createClient();
   const userId = await getUserId(supabase);
 
@@ -39,6 +46,10 @@ export async function createProject(formData: FormData) {
     start_date: new Date().toISOString().slice(0, 10),
     user_id: userId,
   };
+  // kind/parent columns exist only after 0007; include when submitted so the
+  // form still works on a pre-migration database
+  if (PROJECT_KINDS.includes(kind as ProjectKind)) row.kind = kind;
+  if (parentId) row.parent_id = parentId;
   // tags column exists only after 0003_add_tags.sql; the field is only
   // rendered when the probe says so, so only include it when submitted
   const tagsRaw = String(formData.get("tags") ?? "").trim();

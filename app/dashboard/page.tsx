@@ -2,17 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/access";
-import { momentumScore } from "@/lib/momentum";
+import { journeyVitality, momentumScore, type Vitality } from "@/lib/momentum";
 import { timeAgo } from "@/lib/format";
 import type { Phase, Project, Thought } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
 import { AccessBanner } from "@/components/access-banner";
 import { StatusBadge } from "@/components/status-badge";
+import { KindBadge } from "@/components/kind-badge";
 import { GrowthRing } from "@/components/growth-ring";
 
 export const dynamic = "force-dynamic";
 
 const FILTERS = ["All", "Active", "Exploring", "Paused", "Seed", "Completed"];
+
+type Entry = { project: Project; score: number; vitality: Vitality | null };
 
 export default async function Dashboard({
   searchParams,
@@ -61,38 +64,46 @@ export default async function Dashboard({
     );
   }
 
-  const projects = (projectsRes.data ?? []) as Project[];
+  const allRows = (projectsRes.data ?? []) as Project[];
   const phases = (phasesRes.data ?? []) as Pick<Phase, "project_id" | "status">[];
   const thoughts = (thoughtsRes.data ?? []) as Pick<
     Thought,
     "project_id" | "created_at"
   >[];
 
-  // Tags exist only once 0003_add_tags.sql is applied; select("*") makes
-  // detection free — the field is simply absent before then.
-  const tagsEnabled = projects.some((p) => Array.isArray(p.tags));
+  const tagsEnabled = allRows.some((p) => Array.isArray(p.tags));
   const allTags = tagsEnabled
-    ? [...new Set(projects.flatMap((p) => p.tags ?? []))].sort()
+    ? [...new Set(allRows.flatMap((p) => p.tags ?? []))].sort()
     : [];
-  const visible = tagFilter
-    ? projects.filter((p) => (p.tags ?? []).includes(tagFilter))
-    : projects;
 
-  const scored = visible
-    .map((project) => {
-      const projectPhases = phases.filter((p) => p.project_id === project.id);
-      const lastThought =
-        thoughts.find((t) => t.project_id === project.id) ?? null;
-      return {
-        project,
-        score: momentumScore(
-          project,
-          projectPhases as Pick<Phase, "status">[],
-          lastThought,
-        ),
-      };
-    })
-    .sort((a, b) => b.score - a.score);
+  const areas = allRows.filter((p) => p.kind === "area");
+  const rawEntries = allRows.filter((p) => p.kind !== "area");
+  const visible = tagFilter
+    ? rawEntries.filter((p) => (p.tags ?? []).includes(tagFilter))
+    : rawEntries;
+
+  function score(project: Project): Entry {
+    const projectPhases = phases.filter((p) => p.project_id === project.id);
+    const lastThought =
+      thoughts.find((t) => t.project_id === project.id) ?? null;
+    return {
+      project,
+      score: momentumScore(project, projectPhases, lastThought),
+      vitality:
+        project.kind === "journey"
+          ? journeyVitality(project, lastThought)
+          : null,
+    };
+  }
+
+  const entries = visible.map(score).sort((a, b) => b.score - a.score);
+
+  // Group by area only in the default, unfiltered view; a filter flattens.
+  const grouped = areas.length > 0 && filter === "All" && !tagFilter;
+  const areaIds = new Set(areas.map((a) => a.id));
+  const unfiled = entries.filter(
+    (e) => !e.project.parent_id || !areaIds.has(e.project.parent_id),
+  );
 
   return (
     <>
@@ -103,7 +114,7 @@ export default async function Dashboard({
               href="/projects/new"
               className="rounded-lg bg-moss px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
-              New project
+              New
             </Link>
           ) : !access.userId ? (
             <Link
@@ -164,10 +175,8 @@ export default async function Dashboard({
                 key={t}
                 href={
                   tagFilter === t
-                    ? filter === "All"
-                      ? "/dashboard"
-                      : `/dashboard?status=${filter}`
-                    : `/dashboard?${filter === "All" ? "" : `status=${filter}&`}tag=${encodeURIComponent(t)}`
+                    ? "/dashboard"
+                    : `/dashboard?tag=${encodeURIComponent(t)}`
                 }
                 className={`rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors ${
                   tagFilter === t
@@ -181,70 +190,145 @@ export default async function Dashboard({
           </div>
         )}
 
-        <div className="mb-4 mt-5 flex items-baseline justify-between">
-          <h1 className="font-display text-sm font-medium text-faint">
-            {scored.length} project{scored.length === 1 ? "" : "s"}, sorted by
-            momentum
-          </h1>
-        </div>
-
-        {scored.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-card px-6 py-16 text-center">
+        {entries.length === 0 ? (
+          <div className="mt-6 rounded-xl border border-dashed border-line bg-card px-6 py-16 text-center">
             <p className="font-display text-lg">
-              {filter === "All" ? "No projects yet" : `No ${filter} projects`}
+              {filter === "All" && !tagFilter
+                ? "Nothing here yet"
+                : "Nothing matches"}
             </p>
             <p className="mt-1 text-sm text-faint">
-              {filter === "All"
-                ? "Create your first one — it takes under a minute."
-                : "Try a different filter, or create a project."}
+              {filter === "All" && !tagFilter
+                ? "Create your first project or journey — it takes under a minute."
+                : "Try a different filter."}
             </p>
             <Link
               href={access.canWrite ? "/projects/new" : "/login"}
               className="mt-5 inline-block rounded-lg bg-moss px-4 py-2.5 text-sm font-medium text-white"
             >
-              {access.canWrite ? "Create a project" : "Sign up to create projects"}
+              {access.canWrite ? "Create one" : "Sign up to start"}
             </Link>
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {scored.map(({ project, score }) => (
-              <li key={project.id} className="animate-rise">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="block rounded-xl border border-line bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
-                >
-                  <div className="flex items-start gap-3">
-                    <GrowthRing score={score} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <h2 className="font-display truncate text-[17px] font-semibold leading-snug">
-                          {project.title}
-                        </h2>
-                        <StatusBadge status={project.status} />
-                      </div>
-                      {project.summary && (
-                        <p className="mt-1 line-clamp-2 text-sm text-faint">
-                          {project.summary}
-                        </p>
-                      )}
-                      <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-faint/80">
-                        updated {timeAgo(project.last_updated)} · momentum{" "}
-                        {score}
-                        {(project.tags ?? []).length > 0 && (
-                          <span className="normal-case text-moss">
-                            {" "}
-                            · {(project.tags ?? []).map((t) => `#${t}`).join(" ")}
-                          </span>
+        ) : grouped ? (
+          <div className="mt-6 space-y-8">
+            {areas
+              .slice()
+              .sort((a, b) => a.title.localeCompare(b.title))
+              .map((area) => {
+                const kids = entries.filter(
+                  (e) => e.project.parent_id === area.id,
+                );
+                if (kids.length === 0) return null;
+                const drifting = kids.filter(
+                  (e) => e.vitality?.label === "Drifting",
+                ).length;
+                return (
+                  <section key={area.id}>
+                    <div className="mb-2.5 flex items-baseline justify-between gap-3">
+                      <Link
+                        href={`/projects/${area.id}`}
+                        className="font-display text-lg font-semibold underline-offset-4 hover:underline"
+                      >
+                        {area.title}
+                      </Link>
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-faint">
+                        {kids.length} item{kids.length === 1 ? "" : "s"}
+                        {drifting > 0 && (
+                          <span className="text-clay"> · {drifting} drifting</span>
                         )}
-                      </p>
+                      </span>
                     </div>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                    <ul className="space-y-2.5">
+                      {kids.map((e) => (
+                        <EntryCard key={e.project.id} entry={e} />
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            {unfiled.length > 0 && (
+              <section>
+                <h2 className="mb-2.5 font-mono text-[11px] uppercase tracking-wider text-faint">
+                  Unfiled
+                </h2>
+                <ul className="space-y-2.5">
+                  {unfiled.map((e) => (
+                    <EntryCard key={e.project.id} entry={e} />
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 mt-5 flex items-baseline justify-between">
+              <h1 className="font-display text-sm font-medium text-faint">
+                {entries.length} item{entries.length === 1 ? "" : "s"}, sorted by
+                momentum
+              </h1>
+            </div>
+            <ul className="space-y-3">
+              {entries.map((e) => (
+                <EntryCard key={e.project.id} entry={e} />
+              ))}
+            </ul>
+          </>
         )}
       </main>
     </>
+  );
+}
+
+function EntryCard({ entry }: { entry: Entry }) {
+  const { project, score, vitality } = entry;
+  return (
+    <li className="animate-rise">
+      <Link
+        href={`/projects/${project.id}`}
+        className="block rounded-xl border border-line bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+      >
+        <div className="flex items-start gap-3">
+          <GrowthRing score={score} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-display truncate text-[17px] font-semibold leading-snug">
+                {project.title}
+              </h3>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <KindBadge kind={project.kind} />
+                <StatusBadge status={project.status} />
+              </span>
+            </div>
+            {project.summary && (
+              <p className="mt-1 line-clamp-2 text-sm text-faint">
+                {project.summary}
+              </p>
+            )}
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-faint/80">
+              {vitality ? (
+                <span
+                  className={
+                    vitality.label === "Drifting" ? "text-clay" : "text-gold"
+                  }
+                >
+                  {vitality.label}
+                </span>
+              ) : (
+                <>momentum {score}</>
+              )}
+              {" · "}
+              {vitality ? "last touched " : "updated "}
+              {timeAgo(project.last_updated)}
+              {(project.tags ?? []).length > 0 && (
+                <span className="normal-case text-moss">
+                  {" · "}
+                  {(project.tags ?? []).map((t) => `#${t}`).join(" ")}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+      </Link>
+    </li>
   );
 }

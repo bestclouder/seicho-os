@@ -4,10 +4,16 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createProject } from "@/app/actions/projects";
 import { useToast } from "@/components/toast";
-import { PROJECT_STATUSES } from "@/lib/types";
+import { statusesForKind, type ProjectKind } from "@/lib/types";
 
 const inputCls =
   "w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-[15px] outline-none transition-colors focus:border-moss";
+
+const KIND_HINT: Record<ProjectKind, string> = {
+  project: "A finite build with a definition of done.",
+  journey: "An ongoing pursuit with no finish line.",
+  area: "A container that groups projects and journeys.",
+};
 
 export type ProjectFormDefaults = {
   idea_id?: string;
@@ -22,14 +28,25 @@ export type ProjectFormDefaults = {
 export function NewProjectForm({
   defaults,
   tagsEnabled = false,
+  areas = [],
 }: {
   defaults?: ProjectFormDefaults;
   tagsEnabled?: boolean;
+  areas?: { id: string; title: string }[];
 }) {
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [kind, setKind] = useState<ProjectKind>("project");
+  const [statusVal, setStatusVal] = useState(defaults?.status ?? "Seed");
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   const router = useRouter();
+
+  function chooseKind(k: ProjectKind) {
+    setKind(k);
+    const valid = statusesForKind(k).filter((s) => s !== "Archived");
+    if (!valid.includes(statusVal as (typeof valid)[number]))
+      setStatusVal(k === "project" ? "Seed" : "Active");
+  }
 
   function onSubmit(formData: FormData) {
     const title = String(formData.get("title") ?? "").trim();
@@ -50,6 +67,41 @@ export function NewProjectForm({
       {defaults?.idea_id && (
         <input type="hidden" name="idea_id" value={defaults.idea_id} />
       )}
+
+      <Field label="Type">
+        <div className="flex gap-1.5">
+          {(["project", "journey", "area"] as ProjectKind[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => chooseKind(k)}
+              className={`min-h-9 flex-1 rounded-lg border px-2 py-2 font-mono text-[11px] uppercase tracking-wider capitalize transition-colors ${
+                kind === k
+                  ? "border-moss bg-moss text-white"
+                  : "border-line bg-card text-faint hover:text-ink"
+              }`}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+        <input type="hidden" name="kind" value={kind} />
+        <span className="mt-1 block text-xs text-faint">{KIND_HINT[kind]}</span>
+      </Field>
+
+      {kind !== "area" && areas.length > 0 && (
+        <Field label="Area (optional)">
+          <select name="parent_id" defaultValue="" className={inputCls}>
+            <option value="">— none —</option>
+            {areas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       <Field label="Title" required error={titleError}>
         <input
           name="title"
@@ -113,14 +165,17 @@ export function NewProjectForm({
       <Field label="Status">
         <select
           name="status"
-          defaultValue={defaults?.status ?? "Seed"}
+          value={statusVal}
+          onChange={(e) => setStatusVal(e.target.value)}
           className={inputCls}
         >
-          {PROJECT_STATUSES.filter((s) => s !== "Archived").map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
+          {statusesForKind(kind)
+            .filter((s) => s !== "Archived")
+            .map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
         </select>
       </Field>
 

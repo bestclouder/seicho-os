@@ -52,6 +52,15 @@ export default async function NewProjectPage({
     .limit(1);
   const tagsEnabled = !tagsProbe;
 
+  // Areas to file a new project under (0007); empty/absent pre-migration
+  const { data: areaRows } = await supabase
+    .from("projects")
+    .select("id,title")
+    .eq("kind", "area")
+    .neq("status", "Archived")
+    .order("title");
+  const areas = (areaRows ?? []) as { id: string; title: string }[];
+
   let defaults: ProjectFormDefaults | undefined;
   let draftNote: string | null = null;
 
@@ -87,7 +96,11 @@ export default async function NewProjectPage({
           {draftNote ??
             "Capture the understanding now — your future self resumes from it."}
         </p>
-        <NewProjectForm defaults={defaults} tagsEnabled={tagsEnabled} />
+        <NewProjectForm
+          defaults={defaults}
+          tagsEnabled={tagsEnabled}
+          areas={areas}
+        />
       </main>
     </>
   );

@@ -9,20 +9,51 @@ const STATUS_WEIGHT: Record<string, number> = {
   Archived: 0,
 };
 
+function daysSince(project: Project, lastThought: Pick<Thought, "created_at"> | null) {
+  const lastActivity = lastThought?.created_at ?? project.last_updated;
+  return Math.max(
+    0,
+    (Date.now() - new Date(lastActivity).getTime()) / 86_400_000,
+  );
+}
+
+/**
+ * Journeys never "complete", so progress-to-done is meaningless. Their health
+ * is measured by how recently you showed up — consistency, not completion. A
+ * quiet journey is drifting, not failing.
+ */
+export type Vitality = {
+  score: number;
+  label: "Thriving" | "Steady" | "Resting" | "Drifting";
+};
+
+export function journeyVitality(
+  project: Project,
+  lastThought: Pick<Thought, "created_at"> | null,
+): Vitality {
+  const days = daysSince(project, lastThought);
+  if (project.status === "Paused") return { score: 30, label: "Resting" };
+  if (days <= 7) return { score: 92, label: "Thriving" };
+  if (days <= 30) return { score: 66, label: "Steady" };
+  if (days <= 90) return { score: 40, label: "Resting" };
+  return { score: 16, label: "Drifting" };
+}
+
 /**
  * Rule-based momentum score per docs/INTELLIGENCE_LAYER.md — no AI call.
- * score = (1 / days_since_last_thought) * 40 + phase_completion_pct * 40 + status_weight * 20
+ * Projects: (1 / days_since_last_thought) * 40 + phase_completion_pct * 40 + status_weight * 20.
+ * Journeys: consistency-based vitality (they have no finish line).
  */
 export function momentumScore(
   project: Project,
   phases: Pick<Phase, "status">[],
   lastThought: Pick<Thought, "created_at"> | null,
 ): number {
-  const lastActivity = lastThought?.created_at ?? project.last_updated;
-  const days = Math.max(
-    1,
-    (Date.now() - new Date(lastActivity).getTime()) / 86_400_000,
-  );
+  if (project.kind === "journey") {
+    return journeyVitality(project, lastThought).score;
+  }
+
+  const days = Math.max(1, daysSince(project, lastThought));
   const recency = (1 / days) * 40;
 
   const completion =
