@@ -42,9 +42,9 @@ export default async function ImportPage() {
           Import your existing notes
         </h1>
         <p className="mt-1 text-sm text-faint">
-          Paste old goals, plans, and scattered notes — AI proposes projects,
-          thoughts, and ideas. Nothing is saved until you review and confirm.
-          Pasted text is processed by the AI provider.
+          Bring years of scattered notes into your workspace in one paste. Your
+          text is processed by the AI provider to propose the layout — nothing
+          is saved until you review and confirm.
         </p>
         <ImportWizard />
       </main>

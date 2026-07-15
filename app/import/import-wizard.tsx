@@ -26,6 +26,64 @@ const emptyExcluded = (): Excluded => ({
   unsorted: new Set(),
 });
 
+/** Plain-language walkthrough shown above the paste box, before any draft. */
+function ImportGuide() {
+  const steps = [
+    {
+      n: "1",
+      title: "Paste your notes",
+      body: "Drop in anything below — a goal list, journal entries, a brain dump, or a whole export from your notes app. Messy and unstructured is fine; that's the point.",
+    },
+    {
+      n: "2",
+      title: "Press ✦ Analyze",
+      body: "The AI reads all of it, groups related notes into projects and journeys, attaches each note as a dated thought, pulls out to-dos as tasks, and drops loose sparks into your Ideas inbox. Takes about 15–30 seconds.",
+    },
+    {
+      n: "3",
+      title: "Review, then confirm",
+      body: "You see the proposed layout first — nothing is saved yet. Untick anything you don't want, demote a weak project to an idea, or start over. Only when you press Import does it populate your workspace.",
+    },
+  ];
+  return (
+    <div className="mb-5 rounded-2xl border border-line bg-card p-5">
+      <p className="font-display text-[16px] font-semibold">
+        Turn your notes into projects
+      </p>
+      <p className="mt-1 text-sm text-faint">
+        The fastest way to fill your workspace. Three steps, and you approve
+        everything before it&apos;s saved.
+      </p>
+
+      <ol className="mt-4 space-y-3">
+        {steps.map((s) => (
+          <li key={s.n} className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-moss font-mono text-[12px] font-semibold text-white">
+              {s.n}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{s.title}</p>
+              <p className="mt-0.5 text-sm text-faint">{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <div className="mt-4 rounded-xl bg-paper px-3.5 py-3">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-faint">
+          Getting notes out of your app
+        </p>
+        <p className="mt-1 text-sm text-faint">
+          In most apps, open a note, select all (⌘A / Ctrl-A), copy, and paste
+          here — repeat for a few, or paste a whole export at once. Up to 60,000
+          characters per import; run as many imports as you like (rate-limited
+          to keep costs sane).
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ImportWizard() {
   const [rawText, setRawText] = useState("");
   const [draft, setDraft] = useState<ImportDraft | null>(null);
@@ -118,12 +176,13 @@ export function ImportWizard() {
   if (!draft) {
     return (
       <div className="mt-6">
+        <ImportGuide />
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value.slice(0, MAX_CHARS))}
           rows={16}
           placeholder={
-            "Paste anything: old goal lists, plans, journal fragments, notes-app exports…\n\nThe more context, the better the organization."
+            "Paste anything here — then press ✦ Analyze.\n\nExamples that work well:\n• A goal list or new-year resolutions\n• Journal or diary entries\n• A brain dump of everything you're working on\n• Exports from Apple Notes, Notion, Obsidian, Google Docs\n• Meeting or planning notes\n\nThe more you paste, the better it organizes. Include dates if you have them — they carry over onto your notes."
           }
           className="w-full rounded-xl border border-line bg-card px-4 py-3 text-[15px] leading-relaxed outline-none focus:border-moss"
         />
