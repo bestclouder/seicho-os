@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import { writeAudit } from "@/lib/audit";
 import { callAiJson } from "@/lib/ai/provider";
 import { classifyHeuristic, HEURISTIC_SOURCE } from "@/lib/ai/heuristic";
+import { checkAiLimit, logAiUsage, isModelSource } from "@/lib/ai/rate-limit";
 import { SECTION_TAGS, type SectionTag } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "thought_id required" }, { status: 400 });
 
   const supabase = await createClient();
+  const access = await getAccess(supabase);
   const { data: thought } = await supabase
     .from("thoughts")
     .select("id,body")
@@ -36,25 +39,39 @@ export async function POST(request: Request) {
   let confidence: number;
   let source: string;
 
-  try {
-    const ai = await callAiJson(SYSTEM_PROMPT, thought.body);
-    if (ai && SECTION_TAGS.includes(ai.json.section_tag as SectionTag)) {
-      tag = ai.json.section_tag as SectionTag;
-      confidence = Math.max(0, Math.min(1, Number(ai.json.confidence ?? 0.5)));
-      source = ai.source;
-    } else {
+  // Classification is automatic and fire-and-forget, so it degrades silently
+  // rather than erroring: over the AI limit, it falls back to the heuristic
+  // tagger (no OpenAI cost) and the thought still gets a tag.
+  const limit = await checkAiLimit(supabase, access);
+  if (!limit.ok) {
+    const h = classifyHeuristic(thought.body);
+    tag = h.section_tag;
+    confidence = h.confidence;
+    source = HEURISTIC_SOURCE;
+  } else {
+    try {
+      const ai = await callAiJson(SYSTEM_PROMPT, thought.body);
+      if (ai && SECTION_TAGS.includes(ai.json.section_tag as SectionTag)) {
+        tag = ai.json.section_tag as SectionTag;
+        confidence = Math.max(0, Math.min(1, Number(ai.json.confidence ?? 0.5)));
+        source = ai.source;
+      } else {
+        const h = classifyHeuristic(thought.body);
+        tag = h.section_tag;
+        confidence = h.confidence;
+        source = HEURISTIC_SOURCE;
+      }
+    } catch (err) {
+      console.error("classify-thought AI call failed:", err);
       const h = classifyHeuristic(thought.body);
       tag = h.section_tag;
       confidence = h.confidence;
       source = HEURISTIC_SOURCE;
     }
-  } catch (err) {
-    console.error("classify-thought AI call failed:", err);
-    const h = classifyHeuristic(thought.body);
-    tag = h.section_tag;
-    confidence = h.confidence;
-    source = HEURISTIC_SOURCE;
   }
+
+  if (isModelSource(source))
+    await logAiUsage(supabase, access.userId, "classify_thought", source);
 
   const { error } = await supabase
     .from("thoughts")

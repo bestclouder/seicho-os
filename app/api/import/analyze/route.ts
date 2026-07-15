@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/access";
 import { writeAudit } from "@/lib/audit";
 import { analyzeBrainDump, MAX_IMPORT_CHARS } from "@/lib/ai/import";
+import { checkAiLimit, logAiUsage, isModelSource } from "@/lib/ai/rate-limit";
 
 export const dynamic = "force-dynamic";
 // Map-reduce over up to ~8 chunks of pasted text needs more than the default
@@ -39,16 +40,13 @@ export async function POST(request: Request) {
       { status: 400 },
     );
 
-  // simple cost guard: max 5 analyses per hour per user
-  const { count } = await supabase
-    .from("imports")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", access.userId)
-    .gte("created_at", new Date(Date.now() - 3_600_000).toISOString());
-  if ((count ?? 0) >= 5)
+  // Import is the most expensive AI action (map-reduce over many chunks), so
+  // it goes through the shared per-user limiter like every other AI call.
+  const limit = await checkAiLimit(supabase, access);
+  if (!limit.ok)
     return NextResponse.json(
-      { error: "Import limit reached — try again in an hour." },
-      { status: 429 },
+      { error: limit.message },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
     );
 
   let draft;
@@ -73,6 +71,9 @@ export async function POST(request: Request) {
       { error: error?.message ?? "Could not store the draft." },
       { status: 500 },
     );
+
+  if (isModelSource(source))
+    await logAiUsage(supabase, access.userId, "import_analyze", source);
 
   await writeAudit(supabase, {
     entity_type: "import",

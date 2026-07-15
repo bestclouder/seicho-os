@@ -10,6 +10,7 @@ import { AccessBanner } from "@/components/access-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { KindBadge } from "@/components/kind-badge";
 import { GrowthRing } from "@/components/growth-ring";
+import { EmptyWorkspace } from "@/components/empty-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,7 @@ export default async function Dashboard({
   }
 
   const entries = visible.map(score).sort((a, b) => b.score - a.score);
+  const isUnfilteredEmpty = filter === "All" && !tagFilter;
 
   // Group by area only in the default, unfiltered view; a filter flattens.
   const grouped = areas.length > 0 && filter === "All" && !tagFilter;
@@ -207,24 +209,28 @@ export default async function Dashboard({
         )}
 
         {entries.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-dashed border-line bg-card px-6 py-16 text-center">
-            <p className="font-display text-lg">
-              {filter === "All" && !tagFilter
-                ? "Nothing here yet"
-                : "Nothing matches"}
-            </p>
-            <p className="mt-1 text-sm text-faint">
-              {filter === "All" && !tagFilter
-                ? "Create your first project or journey — it takes under a minute."
-                : "Try a different filter."}
-            </p>
-            <Link
-              href={access.canWrite ? "/projects/new" : "/login"}
-              className="mt-5 inline-block rounded-lg bg-moss px-4 py-2.5 text-sm font-medium text-white"
-            >
-              {access.canWrite ? "Create one" : "Sign up to start"}
-            </Link>
-          </div>
+          isUnfilteredEmpty && access.canWrite ? (
+            // A signed-in owner with a genuinely empty workspace gets the full
+            // onboarding: paste, placeholders, or from scratch.
+            <EmptyWorkspace />
+          ) : (
+            <div className="mt-6 rounded-xl border border-dashed border-line bg-card px-6 py-16 text-center">
+              <p className="font-display text-lg">
+                {isUnfilteredEmpty ? "Nothing here yet" : "Nothing matches"}
+              </p>
+              <p className="mt-1 text-sm text-faint">
+                {isUnfilteredEmpty
+                  ? "Create your first project or journey — it takes under a minute."
+                  : "Try a different filter."}
+              </p>
+              <Link
+                href={access.canWrite ? "/projects/new" : "/login"}
+                className="mt-5 inline-block rounded-lg bg-moss px-4 py-2.5 text-sm font-medium text-white"
+              >
+                {access.canWrite ? "Create one" : "Sign up to start"}
+              </Link>
+            </div>
+          )
         ) : grouped ? (
           <div className="mt-6 space-y-8">
             {areas

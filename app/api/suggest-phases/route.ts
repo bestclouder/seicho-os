@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import { writeAudit } from "@/lib/audit";
 import { callAiJson } from "@/lib/ai/provider";
 import { HEURISTIC_SOURCE, suggestPhasesHeuristic } from "@/lib/ai/heuristic";
+import { checkAiLimit, logAiUsage, isModelSource } from "@/lib/ai/rate-limit";
 import type { Project } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "project_id required" }, { status: 400 });
 
   const supabase = await createClient();
+  const access = await getAccess(supabase);
+  const limit = await checkAiLimit(supabase, access);
+  if (!limit.ok)
+    return NextResponse.json(
+      { error: limit.message },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+    );
+
   const { data: project } = await supabase
     .from("projects")
     .select("*")
@@ -69,6 +79,9 @@ export async function POST(request: Request) {
     phases = suggestPhasesHeuristic(p).phases;
     source = HEURISTIC_SOURCE;
   }
+
+  if (isModelSource(source))
+    await logAiUsage(supabase, access.userId, "suggest_phases", source);
 
   await writeAudit(supabase, {
     entity_type: "project",

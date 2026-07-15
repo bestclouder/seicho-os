@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient, getUserId } from "@/lib/supabase/server";
+import { getAccess } from "@/lib/access";
 import { writeAudit } from "@/lib/audit";
 import { callAiJson } from "@/lib/ai/provider";
 import { HEURISTIC_SOURCE, summaryHeuristic } from "@/lib/ai/heuristic";
+import { checkAiLimit, logAiUsage, isModelSource } from "@/lib/ai/rate-limit";
 import { SUMMARY_FIELDS, type Project, type Thought } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "project_id required" }, { status: 400 });
 
   const supabase = await createClient();
+  const access = await getAccess(supabase);
 
   const [projectRes, summaryRes, thoughtsRes] = await Promise.all([
     supabase.from("projects").select("*").eq("id", projectId).maybeSingle(),
@@ -60,6 +63,25 @@ export async function POST(request: Request) {
 
   const thoughts = (thoughtsRes.data ?? []) as Thought[];
 
+  // Never spend an OpenAI call on demo rows or anonymous viewers — they only
+  // ever see the stored summary. Signed-in owners are rate limited.
+  const isDemoOrAnon = !access.userId || project.user_id === null;
+  let limitMsg: string | null = null;
+  if (!isDemoOrAnon) {
+    const limit = await checkAiLimit(supabase, access);
+    if (!limit.ok) limitMsg = limit.message;
+  }
+  const allowAi = !isDemoOrAnon && limitMsg === null;
+
+  // Over budget (or demo/anon) with a stored summary: serve it, don't regenerate.
+  if (!allowAi && existing) {
+    return NextResponse.json({
+      summary: existing,
+      regenerated: false,
+      ...(limitMsg ? { error: limitMsg } : {}),
+    });
+  }
+
   const userPrompt = JSON.stringify({
     project: {
       title: project.title,
@@ -79,7 +101,13 @@ export async function POST(request: Request) {
 
   let fields: Record<string, { value: string; confidence: number }>;
   let source: string;
-  try {
+  if (!allowAi) {
+    // No stored summary to serve and AI isn't allowed — fall back to the free
+    // heuristic so the card still shows something.
+    fields = summaryHeuristic(project, thoughts);
+    source = HEURISTIC_SOURCE;
+  } else {
+    try {
     const ai = await callAiJson(SYSTEM_PROMPT, userPrompt);
     if (ai) {
       fields = Object.fromEntries(
@@ -113,6 +141,7 @@ export async function POST(request: Request) {
     }
     fields = summaryHeuristic(project, thoughts);
     source = HEURISTIC_SOURCE;
+    }
   }
 
   const row: Record<string, unknown> = {
@@ -149,6 +178,9 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
+
+  if (isModelSource(source))
+    await logAiUsage(supabase, access.userId, "generate_summary", source);
 
   await writeAudit(supabase, {
     entity_type: "project_summary",

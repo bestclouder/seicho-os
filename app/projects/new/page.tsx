@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/access";
 import { draftProjectFromIdea } from "@/lib/ai/draft";
+import { checkAiLimit, logAiUsage, isModelSource } from "@/lib/ai/rate-limit";
 import type { Idea } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
 import { AccessBanner } from "@/components/access-banner";
@@ -71,17 +72,36 @@ export default async function NewProjectPage({
       .eq("id", from_idea)
       .maybeSingle();
     if (idea) {
-      const draft = await draftProjectFromIdea(idea as Idea);
-      defaults = {
-        idea_id: from_idea,
-        title: draft.title,
-        summary: draft.summary,
-        vision: draft.vision,
-        why_it_matters: draft.why_it_matters,
-        success_criteria: draft.success_criteria,
-        status: "Exploring",
-      };
-      draftNote = `Drafted from your idea by ${draft.source} — review and edit before saving.`;
+      const typedIdea = idea as Idea;
+      const limit = await checkAiLimit(supabase, access);
+      if (!limit.ok) {
+        // Over the AI budget: skip the draft, just carry the idea across so
+        // they can fill it in by hand.
+        defaults = {
+          idea_id: from_idea,
+          title: typedIdea.title,
+          summary: typedIdea.body ?? "",
+          vision: "",
+          why_it_matters: "",
+          success_criteria: "",
+          status: "Exploring",
+        };
+        draftNote = `${limit.message} Filled in from your idea — draft the rest yourself.`;
+      } else {
+        const draft = await draftProjectFromIdea(typedIdea);
+        defaults = {
+          idea_id: from_idea,
+          title: draft.title,
+          summary: draft.summary,
+          vision: draft.vision,
+          why_it_matters: draft.why_it_matters,
+          success_criteria: draft.success_criteria,
+          status: "Exploring",
+        };
+        if (isModelSource(draft.source))
+          await logAiUsage(supabase, access.userId, "draft_idea", draft.source);
+        draftNote = `Drafted from your idea by ${draft.source} — review and edit before saving.`;
+      }
     }
   }
 

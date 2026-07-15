@@ -56,6 +56,15 @@ export function AuthStatus() {
             <p className="break-all px-2.5 py-2 font-mono text-[11px] text-faint">
               {email}
             </p>
+            {email.toLowerCase() === "bestclouder@gmail.com" && (
+              <Link
+                href="/admin/usage"
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-paper"
+              >
+                AI usage
+              </Link>
+            )}
             <button
               onClick={async () => {
                 setOpen(false);
