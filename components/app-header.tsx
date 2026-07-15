@@ -5,9 +5,9 @@ export function AppHeader({ action }: { action?: React.ReactNode }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4">
-        <Link href="/" className="flex items-baseline gap-2">
-          <span className="font-display text-lg font-semibold tracking-tight">
-            Seichō OS
+        <Link href="/" className="flex shrink-0 items-baseline gap-2">
+          <span className="whitespace-nowrap font-display text-lg font-semibold tracking-tight">
+            Seichō<span className="hidden sm:inline"> OS</span>
           </span>
           <span
             aria-hidden

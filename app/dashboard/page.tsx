@@ -13,7 +13,15 @@ import { GrowthRing } from "@/components/growth-ring";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS = ["All", "Active", "Exploring", "Paused", "Seed", "Completed"];
+const FILTERS = [
+  "All",
+  "Active",
+  "Exploring",
+  "Paused",
+  "Seed",
+  "Completed",
+  "Archived",
+];
 
 type Entry = { project: Project; score: number; vitality: Vitality | null };
 
@@ -34,9 +42,12 @@ export default async function Dashboard({
   let projectsQuery = supabase
     .from("projects")
     .select("*")
-    .neq("status", "Archived")
     .order("last_updated", { ascending: false });
-  if (filter !== "All") projectsQuery = projectsQuery.eq("status", filter);
+  // "All" means everything still alive; archived rows only show on their own filter
+  projectsQuery =
+    filter === "All"
+      ? projectsQuery.neq("status", "Archived")
+      : projectsQuery.eq("status", filter);
   if (access.lockdownApplied && access.userId)
     projectsQuery = projectsQuery.eq("user_id", access.userId);
 
@@ -77,7 +88,12 @@ export default async function Dashboard({
     : [];
 
   const areas = allRows.filter((p) => p.kind === "area");
-  const rawEntries = allRows.filter((p) => p.kind !== "area");
+  // Areas normally render as group headers, but an archived area must still
+  // be findable — the Archived filter lists everything as plain cards.
+  const rawEntries =
+    filter === "Archived"
+      ? allRows
+      : allRows.filter((p) => p.kind !== "area");
   const visible = tagFilter
     ? rawEntries.filter((p) => (p.tags ?? []).includes(tagFilter))
     : rawEntries;

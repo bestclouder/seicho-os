@@ -16,7 +16,8 @@ import { InlineEdit } from "@/components/inline-edit";
 import { StatusBadge } from "@/components/status-badge";
 import { StatusPicker } from "@/components/status-picker";
 import { KindBadge } from "@/components/kind-badge";
-import { ArchiveButton } from "@/components/archive-button";
+import { ArchivedBanner } from "@/components/archived-banner";
+import { ProjectMenu } from "@/components/project-menu";
 import { PhasesPanel } from "@/components/phases-panel";
 import { ThoughtsPanel } from "@/components/thoughts-panel";
 import { ResumeCard } from "@/components/resume-card";
@@ -182,20 +183,11 @@ export default async function ProjectPage({
 
   return (
     <>
-      <AppHeader
-        action={
-          readOnly ? (
-            <StatusBadge status={project.status} />
-          ) : (
-            <StatusPicker
-              projectId={project.id}
-              status={project.status}
-              kind={project.kind}
-            />
-          )
-        }
-      />
+      <AppHeader />
       <AccessBanner access={access} />
+      {project.status === "Archived" && !readOnly && (
+        <ArchivedBanner projectId={project.id} />
+      )}
       <main className="mx-auto max-w-2xl px-4 pb-40 pt-6">
         {(parentArea || (project.kind && project.kind !== "project")) && (
           <div className="mb-1 flex items-center gap-2">
@@ -210,22 +202,45 @@ export default async function ProjectPage({
             <KindBadge kind={project.kind} />
           </div>
         )}
-        <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
-          updated {timeAgo(project.last_updated)}
-          {project.start_date && ` · started ${project.start_date}`}
-          {readOnly && access.lockdownApplied && project.user_id === null && (
-            <span className="text-indigo-ai"> · demo project</span>
+        <div className="flex min-h-8 items-center justify-between gap-3">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
+            updated {timeAgo(project.last_updated)}
+            {project.start_date && ` · started ${project.start_date}`}
+            {readOnly && access.lockdownApplied && project.user_id === null && (
+              <span className="text-indigo-ai"> · demo project</span>
+            )}
+          </p>
+          {!readOnly && (
+            <ProjectMenu
+              projectId={project.id}
+              projectTitle={project.title}
+              status={project.status}
+            />
           )}
-        </p>
-        <div className="mt-1">
-          <InlineEdit
-            projectId={project.id}
-            field="title"
-            label=""
-            value={project.title}
-            multiline={false}
-            readOnly={readOnly}
-          />
+        </div>
+        <div className="mt-1 flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <InlineEdit
+              projectId={project.id}
+              field="title"
+              label=""
+              value={project.title}
+              multiline={false}
+              readOnly={readOnly}
+            />
+          </div>
+          {/* Status belongs to the project, not the app chrome */}
+          <span className="shrink-0">
+            {readOnly ? (
+              <StatusBadge status={project.status} />
+            ) : (
+              <StatusPicker
+                projectId={project.id}
+                status={project.status}
+                kind={project.kind}
+              />
+            )}
+          </span>
         </div>
         <div className="mt-2">
           <InlineEdit
@@ -325,11 +340,6 @@ export default async function ProjectPage({
           readOnly={readOnly}
         />
 
-        {!readOnly && (
-          <div className="mt-10 border-t border-line pt-6">
-            <ArchiveButton projectId={project.id} projectTitle={project.title} />
-          </div>
-        )}
       </main>
     </>
   );
