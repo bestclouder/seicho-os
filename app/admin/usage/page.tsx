@@ -8,8 +8,6 @@ import { AI_PER_DAY, AI_PER_MINUTE } from "@/lib/ai/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_EMAIL = "bestclouder@gmail.com";
-
 const ACTION_LABELS: Record<string, string> = {
   generate_summary: "Understanding summary",
   classify_thought: "Thought classify",
@@ -24,8 +22,9 @@ type ProfileRow = { id: string; email: string; plan: string };
 export default async function AdminUsagePage() {
   const supabase = await createClient();
   const access = await getAccess(supabase);
-  // Owner-only. RLS also blocks the data, but hide the page entirely.
-  if ((access.email ?? "").toLowerCase() !== ADMIN_EMAIL) notFound();
+  // Admin-only (profiles.is_admin). RLS also blocks the data, but hide the
+  // page entirely.
+  if (!access.isAdmin) notFound();
 
   const [usageRes, profilesRes] = await Promise.all([
     supabase

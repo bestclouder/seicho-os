@@ -40,6 +40,30 @@ export async function applyImport(
   )
     return { ok: false, error: "Nothing selected to import." };
 
+  // Claim the import atomically before writing anything: a double tap or a
+  // second tab loses this conditional update and can't apply it twice.
+  const { data: claimed } = await supabase
+    .from("imports")
+    .update({ status: "applied" })
+    .eq("id", importId)
+    .eq("status", "draft")
+    .select("id");
+  if (!claimed || claimed.length === 0)
+    return { ok: false, error: "This import was already applied." };
+
+  // A mid-way failure releases the claim so the user can retry; anything
+  // inserted before the failure stays (no cross-statement transaction here).
+  const failAndRelease = async (message: string): Promise<ApplyImportResult> => {
+    await supabase
+      .from("imports")
+      .update({ status: "draft" })
+      .eq("id", importId);
+    return {
+      ok: false,
+      error: `${message} — some items may already be imported; review your dashboard before retrying.`,
+    };
+  };
+
   let thoughtCount = 0;
   let taskCount = 0;
 
@@ -67,7 +91,8 @@ export async function applyImport(
       })
       .select("id")
       .single();
-    if (error || !project) return { ok: false, error: error?.message ?? "Project write failed." };
+    if (error || !project)
+      return failAndRelease(error?.message ?? "Project write failed.");
 
     if (p.thoughts.length > 0) {
       const { error: thoughtError } = await supabase.from("thoughts").insert(
@@ -81,7 +106,7 @@ export async function applyImport(
           user_id: userId,
         })),
       );
-      if (thoughtError) return { ok: false, error: thoughtError.message };
+      if (thoughtError) return failAndRelease(thoughtError.message);
       thoughtCount += p.thoughts.length;
     }
 
@@ -95,7 +120,7 @@ export async function applyImport(
           user_id: userId,
         })),
       );
-      if (taskError) return { ok: false, error: taskError.message };
+      if (taskError) return failAndRelease(taskError.message);
       taskCount += p.tasks.length;
     }
   }
@@ -115,12 +140,13 @@ export async function applyImport(
   ];
   if (ideaRows.length > 0) {
     const { error: ideaError } = await supabase.from("ideas").insert(ideaRows);
-    if (ideaError) return { ok: false, error: ideaError.message };
+    if (ideaError) return failAndRelease(ideaError.message);
   }
 
+  // Applied — the raw brain dump has served its purpose; don't retain it.
   await supabase
     .from("imports")
-    .update({ status: "applied" })
+    .update({ raw_text: "", draft: null })
     .eq("id", importId);
 
   await writeAudit(supabase, {

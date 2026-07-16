@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 /** Client-side so static headers and loading states never block on auth. */
 export function AuthStatus() {
   const [email, setEmail] = useState<string | null | undefined>(undefined);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -15,7 +16,22 @@ export function AuthStatus() {
     const supabase = createClient();
     supabase.auth
       .getUser()
-      .then(({ data }) => setEmail(data.user?.email ?? null))
+      .then(async ({ data }) => {
+        setEmail(data.user?.email ?? null);
+        if (!data.user) return;
+        // own profile row only (RLS); is_admin arrives with migration 0009,
+        // before that the lifetime plan (the owner) carries admin
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        setIsAdmin(
+          typeof prof?.is_admin === "boolean"
+            ? prof.is_admin
+            : prof?.plan === "lifetime",
+        );
+      })
       .catch(() => setEmail(null));
   }, []);
 
@@ -56,7 +72,7 @@ export function AuthStatus() {
             <p className="break-all px-2.5 py-2 font-mono text-[11px] text-faint">
               {email}
             </p>
-            {email.toLowerCase() === "bestclouder@gmail.com" && (
+            {isAdmin && (
               <Link
                 href="/admin/usage"
                 onClick={() => setOpen(false)}

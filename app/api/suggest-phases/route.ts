@@ -30,12 +30,6 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const access = await getAccess(supabase);
-  const limit = await checkAiLimit(supabase, access);
-  if (!limit.ok)
-    return NextResponse.json(
-      { error: limit.message },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
-    );
 
   const { data: project } = await supabase
     .from("projects")
@@ -47,6 +41,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const p = project as Project;
+
+  // Same rule as generate-summary: never spend a model call on demo rows or
+  // anonymous viewers — they get the free heuristic draft.
+  const isDemoOrAnon = !access.userId || p.user_id === null;
+  if (isDemoOrAnon) {
+    return NextResponse.json({
+      phases: suggestPhasesHeuristic(p).phases,
+      source: HEURISTIC_SOURCE,
+    });
+  }
+
+  const limit = await checkAiLimit(supabase, access);
+  if (!limit.ok)
+    return NextResponse.json(
+      { error: limit.message },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+    );
   const userPrompt = JSON.stringify({
     title: p.title,
     vision: p.vision,

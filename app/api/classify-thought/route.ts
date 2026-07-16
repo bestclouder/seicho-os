@@ -83,8 +83,14 @@ export async function POST(request: Request) {
     })
     .eq("id", thoughtId);
 
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // keep DB internals out of the response; the log has the real reason
+    console.error("classify-thought tag update failed:", error.message);
+    return NextResponse.json(
+      { error: "Could not save the tag." },
+      { status: 500 },
+    );
+  }
 
   await writeAudit(supabase, {
     entity_type: "thought",

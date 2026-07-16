@@ -30,6 +30,11 @@ import type { ProjectRelationship } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+// Route params flow into PostgREST filters (.or below) — only a real UUID
+// may pass, everything else is a 404, not a query fragment.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const FIELDS: { field: string; label: string; placeholder: string }[] = [
   {
     field: "vision",
@@ -59,6 +64,7 @@ export default async function ProjectPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
   const supabase = await createClient();
   const access = await getAccess(supabase);
 
